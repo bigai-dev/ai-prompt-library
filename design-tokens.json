@@ -1,0 +1,186 @@
+{
+  "$description": "AI Prompt Library — Big AI Sdn Bhd Design Tokens",
+  "$version": "1.0.0",
+
+  "primitive": {
+    "color": {
+      "white": "#FFFFFF",
+      "black": "#000000",
+
+      "slate": {
+        "50":  "#F8FAFC",
+        "100": "#F1F5F9",
+        "200": "#E2E8F0",
+        "300": "#CBD5E1",
+        "400": "#94A3B8",
+        "500": "#64748B",
+        "600": "#475569",
+        "700": "#334155",
+        "800": "#1E293B",
+        "900": "#0F172A",
+        "950": "#020617"
+      },
+
+      "yellow": {
+        "50":  "#FFFBEB",
+        "100": "#FEF3C7",
+        "200": "#FDE68A",
+        "300": "#FCD34D",
+        "400": "#FBBF24",
+        "500": "#F59E0B",
+        "600": "#D97706",
+        "700": "#B45309"
+      },
+
+      "blue": {
+        "50":  "#EFF6FF",
+        "100": "#DBEAFE",
+        "200": "#BFDBFE",
+        "300": "#93C5FD",
+        "400": "#60A5FA",
+        "500": "#3B82F6",
+        "600": "#2563EB"
+      },
+
+      "green": {
+        "500": "#22C55E",
+        "600": "#16A34A"
+      },
+
+      "red": {
+        "500": "#EF4444",
+        "600": "#DC2626"
+      }
+    },
+
+    "spacing": {
+      "0": "0",
+      "1": "0.25rem",
+      "2": "0.5rem",
+      "3": "0.75rem",
+      "4": "1rem",
+      "5": "1.25rem",
+      "6": "1.5rem",
+      "8": "2rem",
+      "10": "2.5rem",
+      "12": "3rem",
+      "16": "4rem",
+      "20": "5rem",
+      "24": "6rem"
+    },
+
+    "fontSize": {
+      "xs":   "0.75rem",
+      "sm":   "0.875rem",
+      "base": "1rem",
+      "lg":   "1.125rem",
+      "xl":   "1.25rem",
+      "2xl":  "1.5rem",
+      "3xl":  "1.875rem",
+      "4xl":  "2.25rem"
+    },
+
+    "radius": {
+      "sm":   "0.25rem",
+      "md":   "0.375rem",
+      "lg":   "0.5rem",
+      "xl":   "0.75rem",
+      "2xl":  "1rem"
+    },
+
+    "shadow": {
+      "sm":   "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+      "md":   "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
+      "lg":   "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)"
+    },
+
+    "fontFamily": {
+      "sans": "Inter, 'Noto Sans SC', system-ui, -apple-system, sans-serif",
+      "mono": "'JetBrains Mono', 'Fira Code', 'Consolas', monospace"
+    }
+  },
+
+  "semantic": {
+    "color": {
+      "background":           "white",
+      "foreground":           "slate.900",
+      "card":                 "white",
+      "card-foreground":      "slate.900",
+      "primary":              "yellow.300",
+      "primary-hover":        "yellow.400",
+      "primary-foreground":   "slate.900",
+      "secondary":            "slate.100",
+      "secondary-foreground": "slate.900",
+      "muted":                "slate.100",
+      "muted-foreground":     "slate.500",
+      "accent":               "yellow.50",
+      "accent-foreground":    "slate.900",
+      "destructive":          "red.600",
+      "destructive-foreground": "white",
+      "success":              "green.600",
+      "success-foreground":   "white",
+      "warning":              "yellow.300",
+      "warning-foreground":   "slate.900",
+      "border":               "slate.200",
+      "input":                "slate.200",
+      "ring":                 "yellow.400"
+    },
+    "radius": {
+      "card":    "xl",
+      "button":  "lg",
+      "badge":   "9999px",
+      "input":   "lg"
+    }
+  },
+
+  "component": {
+    "prompt-code-block": {
+      "bg":           "slate.900",
+      "fg":           "slate.100",
+      "variable-highlight": "red.500",
+      "radius":       "xl",
+      "padding":      "6"
+    },
+    "boss-tip-callout": {
+      "bg":           "yellow.50",
+      "border":       "yellow.300",
+      "fg":           "slate.800",
+      "icon-color":   "yellow.500",
+      "radius":       "xl",
+      "padding":      "4"
+    },
+    "variable-input": {
+      "bg":           "blue.50",
+      "border":       "blue.200",
+      "focus-border": "blue.500",
+      "radius":       "lg",
+      "padding":      "3"
+    },
+    "copy-button": {
+      "bg":           "yellow.300",
+      "fg":           "slate.900",
+      "hover-bg":     "yellow.400",
+      "radius":       "lg",
+      "font-weight":  "600"
+    },
+    "prompt-card": {
+      "bg":           "white",
+      "border":       "slate.200",
+      "hover-border": "slate.300",
+      "shadow":       "sm",
+      "hover-shadow": "md",
+      "radius":       "xl",
+      "padding":      "5"
+    },
+    "difficulty-badge": {
+      "easy":   { "bg": "green.500", "fg": "white" },
+      "medium": { "bg": "yellow.400", "fg": "slate.900" },
+      "hard":   { "bg": "red.500", "fg": "white" }
+    },
+    "category-pill": {
+      "bg":     "slate.100",
+      "fg":     "slate.700",
+      "radius": "9999px"
+    }
+  }
+}

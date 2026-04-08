@@ -1,0 +1,159 @@
+/*
+ * AI Prompt Library — Design Tokens
+ * Big AI Sdn Bhd
+ *
+ * Three-layer token system:
+ *   Primitive → Semantic → Component
+ *
+ * Import this file in globals.css via @import or paste into @layer base.
+ */
+
+/* === PRIMITIVES === */
+:root {
+  /* Slate (primary text/surface palette) */
+  --color-slate-50:  #F8FAFC;
+  --color-slate-100: #F1F5F9;
+  --color-slate-200: #E2E8F0;
+  --color-slate-300: #CBD5E1;
+  --color-slate-400: #94A3B8;
+  --color-slate-500: #64748B;
+  --color-slate-600: #475569;
+  --color-slate-700: #334155;
+  --color-slate-800: #1E293B;
+  --color-slate-900: #0F172A;
+  --color-slate-950: #020617;
+
+  /* Yellow / Gold (brand accent — lightning bolt) */
+  --color-yellow-50:  #FFFBEB;
+  --color-yellow-100: #FEF3C7;
+  --color-yellow-200: #FDE68A;
+  --color-yellow-300: #FCD34D;
+  --color-yellow-400: #FBBF24;
+  --color-yellow-500: #F59E0B;
+  --color-yellow-600: #D97706;
+  --color-yellow-700: #B45309;
+
+  /* Blue (variable inputs, links) */
+  --color-blue-50:  #EFF6FF;
+  --color-blue-100: #DBEAFE;
+  --color-blue-200: #BFDBFE;
+  --color-blue-300: #93C5FD;
+  --color-blue-400: #60A5FA;
+  --color-blue-500: #3B82F6;
+  --color-blue-600: #2563EB;
+
+  /* Status */
+  --color-green-500: #22C55E;
+  --color-green-600: #16A34A;
+  --color-red-500:   #EF4444;
+  --color-red-600:   #DC2626;
+
+  /* Typography */
+  --font-sans: 'Inter', 'Noto Sans SC', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+
+  /* Radius */
+  --radius-sm:  0.25rem;  /* 4px */
+  --radius-md:  0.375rem; /* 6px */
+  --radius-lg:  0.5rem;   /* 8px — buttons */
+  --radius-xl:  0.75rem;  /* 12px — cards */
+  --radius-2xl: 1rem;     /* 16px */
+  --radius-full: 9999px;  /* pills/badges */
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+
+  /* Motion */
+  --duration-fast:   150ms;
+  --duration-normal: 200ms;
+  --duration-slow:   300ms;
+}
+
+/* === SEMANTIC === */
+:root {
+  /* Surfaces */
+  --background:           #FFFFFF;
+  --foreground:           var(--color-slate-900);
+  --card:                 #FFFFFF;
+  --card-foreground:      var(--color-slate-900);
+  --popover:              #FFFFFF;
+  --popover-foreground:   var(--color-slate-900);
+
+  /* Primary — Yellow/Gold (CTA buttons, accents) */
+  --primary:              var(--color-yellow-300);
+  --primary-hover:        var(--color-yellow-400);
+  --primary-foreground:   var(--color-slate-900);
+
+  /* Secondary — Slate light */
+  --secondary:            var(--color-slate-100);
+  --secondary-hover:      var(--color-slate-200);
+  --secondary-foreground: var(--color-slate-900);
+
+  /* Muted */
+  --muted:                var(--color-slate-100);
+  --muted-foreground:     var(--color-slate-500);
+
+  /* Accent — Yellow tint */
+  --accent:               var(--color-yellow-50);
+  --accent-foreground:    var(--color-slate-900);
+
+  /* Destructive */
+  --destructive:          var(--color-red-600);
+  --destructive-foreground: #FFFFFF;
+
+  /* Borders & Focus */
+  --border:               var(--color-slate-200);
+  --input:                var(--color-slate-200);
+  --ring:                 var(--color-yellow-400);
+
+  /* Base radius (shadcn/ui convention) */
+  --radius:               0.5rem;
+}
+
+/* === COMPONENT TOKENS === */
+:root {
+  /* Prompt Code Block (dark navy, the hero element) */
+  --code-block-bg:        var(--color-slate-900);
+  --code-block-fg:        var(--color-slate-100);
+  --code-block-variable:  var(--color-red-500);
+  --code-block-radius:    var(--radius-xl);
+  --code-block-padding:   1.5rem;
+
+  /* Boss Tip Callout (yellow highlight) */
+  --boss-tip-bg:          var(--color-yellow-50);
+  --boss-tip-border:      var(--color-yellow-300);
+  --boss-tip-fg:          var(--color-slate-800);
+  --boss-tip-icon:        var(--color-yellow-500);
+
+  /* Variable Input Fields (blue tint) */
+  --var-input-bg:         var(--color-blue-50);
+  --var-input-border:     var(--color-blue-200);
+  --var-input-focus:      var(--color-blue-500);
+
+  /* Copy Button (primary CTA) */
+  --copy-btn-bg:          var(--color-yellow-300);
+  --copy-btn-fg:          var(--color-slate-900);
+  --copy-btn-hover:       var(--color-yellow-400);
+
+  /* Prompt Card */
+  --prompt-card-bg:       #FFFFFF;
+  --prompt-card-border:   var(--color-slate-200);
+  --prompt-card-hover-border: var(--color-slate-300);
+  --prompt-card-shadow:   var(--shadow-sm);
+  --prompt-card-hover-shadow: var(--shadow-md);
+  --prompt-card-radius:   var(--radius-xl);
+
+  /* Difficulty Badges */
+  --badge-easy-bg:        var(--color-green-500);
+  --badge-easy-fg:        #FFFFFF;
+  --badge-medium-bg:      var(--color-yellow-400);
+  --badge-medium-fg:      var(--color-slate-900);
+  --badge-hard-bg:        var(--color-red-500);
+  --badge-hard-fg:        #FFFFFF;
+
+  /* Category Pill */
+  --category-pill-bg:     var(--color-slate-100);
+  --category-pill-fg:     var(--color-slate-700);
+}
