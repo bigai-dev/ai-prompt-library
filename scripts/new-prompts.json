@@ -1,0 +1,424 @@
+[
+  {
+    "slug": "table-reservation-system",
+    "title_en": "Table Reservation System",
+    "title_zh": "餐厅订位系统",
+    "subtitle": "替代 Eatigo/OpenTable 的马来西亚本地化餐厅预约管理系统",
+    "category": "operations",
+    "difficulty": "hard",
+    "estimated_minutes": 90,
+    "boss_tip": "Start by building the customer booking flow first — get that working end-to-end with Supabase Realtime before touching the admin dashboard. A working booking page you can demo on your phone is worth more than a half-finished admin panel.",
+    "prompt_body": "你是一位资深全栈工程师。请帮我搭建一个完整的**餐厅订位系统**，专为马来西亚餐饮业设计，取代 Eatigo/OpenTable。\n\n## 项目概述\n\n餐厅名称：{restaurant_name}\n餐厅类型：{restaurant_type}\n桌数：{num_tables} 张\n最大派对人数：{max_party_size} 人\n营业时间：{operating_hours}\n品牌主色：{primary_color}\n可预订提前天数：{booking_lead_days} 天\n\n## 技术栈\n\n- **前端**：Next.js 16（App Router）+ Tailwind CSS 4\n- **后端/数据库**：Supabase（Postgres + Auth + Realtime + Edge Functions）\n- **部署**：Vercel\n- **短信/WhatsApp**：模拟发送（console.log + toast 通知，预留 API 接口）\n\n## 数据模型（Supabase Postgres）\n\n### restaurants 表\n- id (uuid, PK), name (text), type (text), phone (text), address (text)\n- operating_hours (jsonb) — 格式: {\"mon\": {\"open\": \"11:00\", \"close\": \"22:00\"}, ...}\n- default_slot_duration (int, 默认 90 分钟), primary_color (text)\n- created_at (timestamptz)\n\n### tables 表\n- id (uuid, PK), restaurant_id (FK → restaurants), table_number (text)\n- min_capacity (int), max_capacity (int), zone (text, 如 \"室内\"/\"露台\"/\"包厢\")\n- is_active (boolean, 默认 true)\n- 索引：restaurant_id, zone\n\n### time_slots 表\n- id (uuid, PK), restaurant_id (FK), date (date), start_time (time), end_time (time)\n- total_capacity (int), booked_count (int, 默认 0)\n- is_blocked (boolean, 默认 false), block_reason (text)\n- 索引：(restaurant_id, date, start_time) UNIQUE\n\n### reservations 表\n- id (uuid, PK), restaurant_id (FK), table_id (FK → tables, nullable)\n- customer_name (text), customer_phone (text, +60 格式)\n- customer_email (text, nullable), party_size (int)\n- date (date), start_time (time), end_time (time)\n- status (enum: 'pending' → 'confirmed' → 'seated' → 'completed' | 'cancelled' | 'no_show')\n- special_requests (text), source (enum: 'online' | 'phone' | 'walk_in')\n- confirmation_code (text, 6位大写字母数字), confirmed_at (timestamptz)\n- no_show_at (timestamptz), created_at (timestamptz)\n- 索引：(restaurant_id, date, status), customer_phone, confirmation_code UNIQUE\n\n### waitlist 表\n- id (uuid, PK), restaurant_id (FK), customer_name (text)\n- customer_phone (text), party_size (int)\n- estimated_wait_minutes (int), status (enum: 'waiting' → 'notified' → 'seated' | 'left')\n- queue_position (int), joined_at (timestamptz), seated_at (timestamptz)\n- 索引：(restaurant_id, status, queue_position)\n\n### blocked_dates 表\n- id (uuid, PK), restaurant_id (FK), date (date)\n- reason (text, 如 \"农历新年休息\"/\"私人活动\")\n- 索引：(restaurant_id, date) UNIQUE\n\n### no_show_records 表\n- id (uuid, PK), customer_phone (text), restaurant_id (FK)\n- reservation_id (FK → reservations), recorded_at (timestamptz)\n- 视图：按 customer_phone 统计 no_show_count\n\n## RLS 安全策略\n\n- **公开读取**：restaurants（基本信息）、time_slots（可用性）\n- **公开写入**：reservations（INSERT only, 顾客预订）、waitlist（INSERT only）\n- **管理员完全访问**：所有表的 CRUD，通过 auth.uid() 匹配 admins 表\n- 使用 `(select auth.uid())` 包装避免逐行函数调用\n\n## 业务逻辑\n\n### 防止超额预订\n1. 预订前查询 time_slots.booked_count < time_slots.total_capacity\n2. 使用 Postgres 事务 + SELECT FOR UPDATE 锁定时间段\n3. 插入 reservation 后自动递增 booked_count（使用 trigger）\n4. 取消时递减 booked_count\n\n### 确认流程\n1. 顾客提交预订 → status='pending' → 生成 confirmation_code\n2. 模拟发送 WhatsApp 确认消息（含确认码、日期、时间、人数）\n3. 顾客点击确认链接 → status='confirmed'\n4. 预订前 2 小时发送提醒（模拟）\n5. 超过 30 分钟未到 → 管理员可标记 no_show\n\n### No-Show 政策\n- 累计 3 次 no_show → 预订时显示警告\n- 累计 5 次 → 需要预付定金（UI 显示提示，实际支付暂不实现）\n- 管理员可手动清除 no_show 记录\n\n### 等位管理\n- Walk-in 客人加入 waitlist → 自动分配 queue_position\n- 有桌空出时 → 通知排队第一位（模拟 WhatsApp）\n- 通知后 10 分钟无响应 → 自动跳过，通知下一位\n- Supabase Realtime 订阅 waitlist 变更，管理端实时更新\n\n## 前端页面（顾客端 — 移动优先）\n\n### /book 预订页面\n- 步骤式表单（Step 1→4）：\n  1. 选择日期（日历组件，禁用 blocked_dates，最多提前 {booking_lead_days} 天）\n  2. 选择时间段（网格按钮，灰色=已满，绿色=有位，显示剩余数量）\n  3. 填写人数 + 特殊要求（过敏、儿童椅、生日蛋糕等）\n  4. 填写联系方式（姓名、+60 手机号、邮箱选填）\n- 底部固定\"确认预订\"按钮，{primary_color} 主色\n- 成功后显示确认码 + 模拟 WhatsApp 消息预览\n\n### /book/status/[code] 预订状态页\n- 输入确认码查询预订状态\n- 显示：日期、时间、人数、状态徽章\n- 可取消预订（提前 2 小时以上）\n\n### /waitlist 等位页面\n- 输入姓名、手机号、人数\n- 加入后显示：排队位置、预计等待时间（实时更新）\n- Supabase Realtime 监听位置变化\n\n## 前端页面（管理端 — 桌面优先）\n\n### /admin/dashboard 仪表盘\n- 今日概览卡片：总预订数、已确认、已就座、no_show 数\n- 当前等位人数 + 平均等待时间\n- 本周预订趋势折线图（简易 SVG 或 Chart 组件）\n\n### /admin/reservations 预订管理\n- 表格视图：日期筛选、状态筛选\n- 列：确认码、姓名、电话、人数、时间、状态、操作\n- 操作：确认、标记就座、标记完成、标记 no_show、取消\n- 点击行展开详情（特殊要求、历史 no_show 次数）\n\n### /admin/floor-plan 楼层管理\n- 桌位列表（非图形化，表格即可）\n- 每桌显示：桌号、容量、区域、当前状态（空闲/占用/已预订）\n- 可拖拽分配桌位给预订（简易实现）\n\n### /admin/settings 设置\n- 营业时间编辑（按星期几设置）\n- 时间段容量配置（如午餐 30 位，晚餐 40 位）\n- 封锁日期管理（添加/删除 blocked_dates）\n- 通知模板编辑（WhatsApp 消息模板）\n\n## 马来西亚本地化\n\n- 界面双语：中文（简体）为主，英文切换\n- 手机号格式：+60 开头，验证马来西亚号码格式\n- 货币：MYR（如果涉及定金显示）\n- 时区：Asia/Kuala_Lumpur (UTC+8)\n- 日期格式：YYYY年MM月DD日 / DD/MM/YYYY\n- 节假日考虑：农历新年、开斋节、屠妖节等\n\n## 示例数据\n\n请生成以下测试数据：\n- 餐厅：{restaurant_name}（{restaurant_type}），地址：Jalan Alor, Bukit Bintang, KL\n- 桌位：12 张（4张2人桌、6张4人桌、2张8人包厢桌）\n- 今日预订 8 笔（含不同状态）\n- 等位名单 3 人\n- 历史 no_show 记录 2 笔\n- 本周 blocked_date 1 天（\"私人包场活动\"）\n\n## Supabase Realtime 配置\n\n- 订阅 reservations 表变更 → 管理端实时更新预订列表\n- 订阅 waitlist 表变更 → 顾客端实时更新排队位置\n- 订阅 time_slots 表变更 → 预订页实时更新可用性\n\n## 关键要求\n\n1. 移动端顾客体验必须流畅（< 3 秒加载，大按钮，清晰步骤）\n2. 管理端支持平板和桌面\n3. 所有数据库操作使用事务防止竞态条件\n4. 代码注释使用中英双语\n5. 使用 Tailwind CSS 4 + shadcn/ui 组件\n6. 部署到 Vercel，环境变量通过 .env.local 管理",
+    "prompt_body_en": "You are a senior full-stack engineer. Build a complete **Table Reservation System** designed for Malaysian F&B businesses, replacing Eatigo/OpenTable.\n\n## Project Overview\n\nRestaurant name: {restaurant_name}\nRestaurant type: {restaurant_type}\nNumber of tables: {num_tables}\nMax party size: {max_party_size}\nOperating hours: {operating_hours}\nBrand primary color: {primary_color}\nBooking lead days: {booking_lead_days}\n\n## Tech Stack\n\n- **Frontend**: Next.js 16 (App Router) + Tailwind CSS 4\n- **Backend/Database**: Supabase (Postgres + Auth + Realtime + Edge Functions)\n- **Deployment**: Vercel\n- **SMS/WhatsApp**: Simulated (console.log + toast notifications, with API interface stub)\n\n## Data Model (Supabase Postgres)\n\n### restaurants table\n- id (uuid, PK), name (text), type (text), phone (text), address (text)\n- operating_hours (jsonb) — format: {\"mon\": {\"open\": \"11:00\", \"close\": \"22:00\"}, ...}\n- default_slot_duration (int, default 90 min), primary_color (text)\n- created_at (timestamptz)\n\n### tables table\n- id (uuid, PK), restaurant_id (FK → restaurants), table_number (text)\n- min_capacity (int), max_capacity (int), zone (text, e.g. \"indoor\"/\"patio\"/\"private room\")\n- is_active (boolean, default true)\n- Indexes: restaurant_id, zone\n\n### time_slots table\n- id (uuid, PK), restaurant_id (FK), date (date), start_time (time), end_time (time)\n- total_capacity (int), booked_count (int, default 0)\n- is_blocked (boolean, default false), block_reason (text)\n- Indexes: (restaurant_id, date, start_time) UNIQUE\n\n### reservations table\n- id (uuid, PK), restaurant_id (FK), table_id (FK → tables, nullable)\n- customer_name (text), customer_phone (text, +60 format)\n- customer_email (text, nullable), party_size (int)\n- date (date), start_time (time), end_time (time)\n- status (enum: 'pending' → 'confirmed' → 'seated' → 'completed' | 'cancelled' | 'no_show')\n- special_requests (text), source (enum: 'online' | 'phone' | 'walk_in')\n- confirmation_code (text, 6-char alphanumeric uppercase), confirmed_at (timestamptz)\n- no_show_at (timestamptz), created_at (timestamptz)\n- Indexes: (restaurant_id, date, status), customer_phone, confirmation_code UNIQUE\n\n### waitlist table\n- id (uuid, PK), restaurant_id (FK), customer_name (text)\n- customer_phone (text), party_size (int)\n- estimated_wait_minutes (int), status (enum: 'waiting' → 'notified' → 'seated' | 'left')\n- queue_position (int), joined_at (timestamptz), seated_at (timestamptz)\n- Indexes: (restaurant_id, status, queue_position)\n\n### blocked_dates table\n- id (uuid, PK), restaurant_id (FK), date (date)\n- reason (text, e.g. \"Chinese New Year closure\" / \"Private event\")\n- Indexes: (restaurant_id, date) UNIQUE\n\n### no_show_records table\n- id (uuid, PK), customer_phone (text), restaurant_id (FK)\n- reservation_id (FK → reservations), recorded_at (timestamptz)\n- View: aggregate no_show_count by customer_phone\n\n## RLS Security Policies\n\n- **Public read**: restaurants (basic info), time_slots (availability)\n- **Public write**: reservations (INSERT only, customer bookings), waitlist (INSERT only)\n- **Admin full access**: All tables CRUD, via auth.uid() matching admins table\n- Wrap auth calls with `(select auth.uid())` to avoid per-row function evaluation\n\n## Business Logic\n\n### Overbooking Prevention\n1. Before booking, verify time_slots.booked_count < time_slots.total_capacity\n2. Use Postgres transaction + SELECT FOR UPDATE to lock the time slot row\n3. After inserting reservation, auto-increment booked_count via trigger\n4. On cancellation, decrement booked_count\n\n### Confirmation Flow\n1. Customer submits booking → status='pending' → generate confirmation_code\n2. Simulate WhatsApp confirmation message (with code, date, time, party size)\n3. Customer clicks confirmation link → status='confirmed'\n4. Send reminder 2 hours before reservation (simulated)\n5. If 30 min late → admin can mark as no_show\n\n### No-Show Policy\n- 3 cumulative no-shows → show warning at booking time\n- 5 cumulative no-shows → require deposit (show UI prompt, actual payment not implemented)\n- Admin can manually clear no-show records\n\n### Walk-in Waitlist Management\n- Walk-in guests join waitlist → auto-assign queue_position\n- When a table opens → notify first in queue (simulated WhatsApp)\n- If no response within 10 min → auto-skip, notify next person\n- Use Supabase Realtime to subscribe to waitlist changes, update admin view live\n\n## Frontend Pages (Customer — Mobile-First)\n\n### /book — Booking Page\n- Step-by-step form (Steps 1→4):\n  1. Select date (calendar widget, disable blocked_dates, max {booking_lead_days} days ahead)\n  2. Select time slot (grid buttons: grey=full, green=available, show remaining count)\n  3. Enter party size + special requests (allergies, high chair, birthday cake, etc.)\n  4. Enter contact info (name, +60 phone number, optional email)\n- Fixed bottom \"Confirm Booking\" button in {primary_color}\n- On success: show confirmation code + simulated WhatsApp message preview\n\n### /book/status/[code] — Booking Status Page\n- Look up reservation by confirmation code\n- Display: date, time, party size, status badge\n- Allow cancellation (if more than 2 hours before reservation)\n\n### /waitlist — Walk-in Waitlist Page\n- Enter name, phone, party size\n- After joining: show queue position + estimated wait time (real-time updates)\n- Supabase Realtime subscription for position changes\n\n## Frontend Pages (Admin — Desktop-First)\n\n### /admin/dashboard — Dashboard\n- Today's overview cards: total bookings, confirmed, seated, no-shows\n- Current waitlist count + average wait time\n- Weekly booking trend chart (simple SVG or chart component)\n\n### /admin/reservations — Reservation Management\n- Table view with date filter and status filter\n- Columns: confirmation code, name, phone, party size, time, status, actions\n- Actions: confirm, mark seated, mark completed, mark no-show, cancel\n- Click row to expand details (special requests, historical no-show count)\n\n### /admin/floor-plan — Floor Management\n- Table list (table-based, not graphical)\n- Per table: table number, capacity, zone, current status (vacant/occupied/reserved)\n- Simple drag-to-assign tables to reservations\n\n### /admin/settings — Settings\n- Operating hours editor (per day of week)\n- Time slot capacity config (e.g. lunch 30 pax, dinner 40 pax)\n- Blocked dates management (add/remove blocked_dates)\n- Notification template editor (WhatsApp message templates)\n\n## Malaysian Localization\n\n- Bilingual UI: Simplified Chinese primary, English toggle\n- Phone format: +60 prefix, validate Malaysian phone numbers\n- Currency: MYR (if deposit display is needed)\n- Timezone: Asia/Kuala_Lumpur (UTC+8)\n- Date format: YYYY年MM月DD日 / DD/MM/YYYY\n- Holiday awareness: Chinese New Year, Hari Raya, Deepavali, etc.\n\n## Sample Data\n\nGenerate the following test data:\n- Restaurant: {restaurant_name} ({restaurant_type}), address: Jalan Alor, Bukit Bintang, KL\n- Tables: 12 total (4x 2-pax, 6x 4-pax, 2x 8-pax private room)\n- Today's reservations: 8 bookings (mixed statuses)\n- Waitlist: 3 people currently waiting\n- Historical no-show records: 2 entries\n- This week's blocked_date: 1 day (\"Private event booking\")\n\n## Supabase Realtime Configuration\n\n- Subscribe to reservations table changes → live-update admin reservation list\n- Subscribe to waitlist table changes → live-update customer queue position\n- Subscribe to time_slots table changes → live-update booking page availability\n\n## Key Requirements\n\n1. Mobile customer experience must be smooth (< 3s load, large tap targets, clear steps)\n2. Admin interface supports tablet and desktop\n3. All database operations use transactions to prevent race conditions\n4. Code comments in bilingual Chinese/English\n5. Use Tailwind CSS 4 + shadcn/ui components\n6. Deploy to Vercel, environment variables via .env.local",
+    "preview_prompt": "Build a single responsive HTML page showing the customer-facing booking screen (Step 2: Time Slot Selection) for a restaurant called \"{restaurant_name}\". Display a date header showing \"2026年4月11日 (Saturday)\", then render a grid of time slot buttons from 11:00 to 21:00 in 90-minute intervals. Style available slots in green with remaining seat count (e.g. \"12:30 · 剩余8位\"), full slots in grey with \"已满\" label, and one slot highlighted as selected with a {primary_color} border. Below the grid show a party size selector (1-{max_party_size}) and a fixed bottom bar with a \"{primary_color}\" colored \"下一步 Next\" button. Use Tailwind CSS, mobile-first layout (max-w-md centered), and include the restaurant name in a top header bar.",
+    "tags": [
+      "full-app",
+      "fnb-tool",
+      "supabase-realtime",
+      "booking-system",
+      "walk-in-waitlist"
+    ],
+    "industries": [
+      "fnb",
+      "services"
+    ],
+    "variables": [
+      {
+        "key": "restaurant_name",
+        "label_en": "Restaurant Name",
+        "label_zh": "餐厅名称",
+        "default_value": "",
+        "default_value_en": "",
+        "input_type": "text"
+      },
+      {
+        "key": "restaurant_type",
+        "label_en": "Restaurant Type",
+        "label_zh": "餐厅类型",
+        "default_value": "",
+        "default_value_en": "",
+        "input_type": "text"
+      },
+      {
+        "key": "num_tables",
+        "label_en": "Number of Tables",
+        "label_zh": "桌数",
+        "default_value": "12",
+        "default_value_en": "12",
+        "input_type": "number"
+      },
+      {
+        "key": "max_party_size",
+        "label_en": "Max Party Size",
+        "label_zh": "最大派对人数",
+        "default_value": "8",
+        "default_value_en": "8",
+        "input_type": "number"
+      },
+      {
+        "key": "operating_hours",
+        "label_en": "Operating Hours",
+        "label_zh": "营业时间",
+        "default_value": "11:00 AM - 10:00 PM",
+        "default_value_en": "11:00 AM - 10:00 PM",
+        "input_type": "text"
+      },
+      {
+        "key": "primary_color",
+        "label_en": "Brand Primary Color",
+        "label_zh": "品牌主色",
+        "default_value": "#D69E2E",
+        "default_value_en": "#D69E2E",
+        "input_type": "text"
+      },
+      {
+        "key": "booking_lead_days",
+        "label_en": "Booking Lead Days",
+        "label_zh": "可预订提前天数",
+        "default_value": "14",
+        "default_value_en": "14",
+        "input_type": "number"
+      }
+    ],
+    "related": [
+      "qr-menu-ordering-system"
+    ]
+  },
+  {
+    "slug": "appointment-booking-system",
+    "title_en": "Appointment Booking System",
+    "title_zh": "预约排班系统",
+    "subtitle": "取代 Fresha/Calendly，适合美容院、诊所、补习中心、咨询顾问的完整预约管理系统",
+    "category": "operations",
+    "difficulty": "hard",
+    "estimated_minutes": 90,
+    "boss_tip": "先把你最忙的那天的时间表写下来——几点开门、哪些师傅上班、每个服务要多久。这些就是你给 AI 的核心资料。系统做好后，先用一周的真实预约来测试，确保不会出现撞期或漏单。",
+    "prompt_body": "你是一位资深全栈工程师。请为「{business_name}」搭建一套完整的预约排班系统。\n这是一家位于马来西亚的{business_type}，目前有 {num_staff} 位员工，营业时间为 {operating_hours}。\n\n技术栈：Next.js 16 (App Router) + Tailwind CSS 4 + Supabase (Postgres + Auth + RLS + Realtime)\n\n---\n\n## 一、数据模型 (Supabase Postgres)\n\n### 1. businesses 商家表\n- id (uuid, PK), name, type, phone, address, operating_hours (jsonb), booking_interval ({booking_interval}分钟), cancellation_hours (提前几小时可取消), primary_color ({primary_color}), created_at\n\n### 2. staff 员工表\n- id (uuid, PK), business_id (FK), name, phone, email, avatar_url, bio, is_active, sort_order, created_at\n- 建立 business_id 索引\n\n### 3. staff_schedules 员工排班表\n- id (uuid, PK), staff_id (FK), day_of_week (0-6), start_time (time), end_time (time), is_working (boolean)\n- 每位员工每天一条记录，表示该天是否上班及时段\n- 建立 staff_id + day_of_week 复合索引\n\n### 4. staff_breaks 员工休息时段\n- id (uuid, PK), staff_id (FK), day_of_week, break_start (time), break_end (time)\n\n### 5. staff_off_days 员工请假/特殊休息日\n- id (uuid, PK), staff_id (FK), off_date (date), reason\n- 建立 staff_id + off_date 索引\n\n### 6. services 服务项目表\n- id (uuid, PK), business_id (FK), name_zh, name_en, description_zh, description_en, duration_minutes, price (numeric, MYR), category, is_active, sort_order, created_at\n\n### 7. staff_services 员工-服务关联表 (多对多)\n- staff_id (FK), service_id (FK), PRIMARY KEY (staff_id, service_id)\n\n### 8. customers 顾客表\n- id (uuid, PK), business_id (FK), name, phone (格式 +60xxxxxxxxx), email, visit_count (default 0), total_spend (default 0), notes, first_visit_at, last_visit_at, created_at\n- 建立 phone + business_id 唯一索引（同一商家同一手机号不重复）\n\n### 9. bookings 预约表\n- id (uuid, PK), business_id (FK), customer_id (FK), staff_id (FK), service_id (FK)\n- booking_date (date), start_time (time), end_time (time，自动算：start_time + service.duration_minutes)\n- status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no_show'\n- total_price (numeric), notes, cancelled_at, cancel_reason\n- created_at, updated_at\n- 建立索引：staff_id + booking_date + start_time (防撞期核心索引)\n- 建立索引：customer_id, booking_date\n- RLS：anon 可 INSERT (创建预约)，admin 可全部 CRUD\n\n### 10. booking_events 预约事件日志\n- id (uuid, PK), booking_id (FK), event_type ('created'|'confirmed'|'cancelled'|'completed'|'reminder_sent'), metadata (jsonb), created_at\n\n---\n\n## 二、核心业务逻辑\n\n### 时段计算算法（最重要！）\n1. 输入：service_id, staff_id, target_date\n2. 查 staff_schedules 获取该员工当天的上班时段，若 is_working=false 返回空\n3. 查 staff_off_days 确认当天未请假\n4. 用 {booking_interval} 分钟为间隔，生成所有可能的时段起点\n5. 对每个时段：检查 start_time 到 end_time (start + duration) 是否与以下冲突：\n   - 已有预约 (status IN ('pending','confirmed'))——用 SQL 范围重叠检查：NOT (end_time <= existing.start_time OR start_time >= existing.end_time)\n   - 员工休息时段 (staff_breaks)\n6. 过滤掉已过去的时间（当天）\n7. 返回可用时段数组 [{start: '10:00', end: '10:45'},...]\n\n### 防撞期机制\n- 在 bookings 表建立 EXCLUDE constraint 或在 Server Action 中用 SELECT ... FOR UPDATE 锁行后再 INSERT\n- 创建预约的 Server Action 必须在事务中执行：先锁定检查再插入\n\n### 取消政策\n- 预约前 cancellation_hours 小时内不可取消\n- 取消后自动释放时段\n- 记录取消原因到 booking_events\n\n### 顾客追踪\n- 每次预约完成 (status→completed) 时，用 Supabase Function 或 Server Action 更新 customers.visit_count +1, total_spend + booking.total_price, last_visit_at\n\n---\n\n## 三、页面与 UI/UX\n\n### A. 顾客预约页面 /book (公开页面，无需登录)\n主色调使用 {primary_color}，白底简洁风格。\n\n**Step 1 — 选择服务**\n- 服务卡片网格，显示：服务名（中英双语）、时长、价格 (RM)\n- 点击选中，高亮边框\n\n**Step 2 — 选择员工**\n- 显示能做该服务的员工头像+名字\n- 可选「不指定（任何可用员工）」\n\n**Step 3 — 选择日期时间**\n- 日历组件选日期（禁用过去日期和全店休息日）\n- 选日期后显示可用时段网格（每格 {booking_interval} 分钟）\n- 已满时段灰色不可点，可用时段可点击选中\n\n**Step 4 — 填写资料**\n- 姓名、手机号 (+60 前缀自动填充)、邮箱（选填）、备注\n- 手机号校验马来西亚格式\n\n**Step 5 — 确认预约**\n- 摘要卡片：服务、员工、日期时间、价格\n- 确认按钮\n- 成功后显示：预约编号、「加入日历」按钮 (生成 .ics 文件)、模拟 WhatsApp 通知 (显示将发送的消息内容)\n\n### B. 管理后台 /admin (需登录)\n\n**B1. 仪表板 /admin/dashboard**\n- 今日预约列表（时间轴样式，按时间排序）\n- 周历视图（横轴=天，纵轴=时间，每位员工一列，预约显示为色块）\n- 统计卡片：今日预约数、本周营收、本月营收、新客数\n\n**B2. 营收报表 /admin/revenue**\n- 按服务统计：每项服务的预约次数、总营收\n- 按员工统计：每位员工的预约次数、总营收\n- 日期范围选择器\n- 导出 CSV\n\n**B3. 预约管理 /admin/bookings**\n- 表格：日期、时间、顾客、服务、员工、状态\n- 筛选：日期范围、状态、员工\n- 操作：确认、完成、取消、标记未到\n\n**B4. 服务管理 /admin/services**\n- CRUD 服务项目\n- 设置哪些员工可执行该服务\n\n**B5. 员工管理 /admin/staff**\n- CRUD 员工\n- 编辑每位员工的每周排班 (可视化时间表编辑器)\n- 管理休息时段和特殊休假\n\n**B6. 顾客管理 /admin/customers**\n- 顾客列表：名字、手机、到访次数、总消费、上次到访\n- 排序：按消费金额、到访次数\n- 点击查看该顾客的完整预约历史\n\n### C. 全局 UI 规范\n- 双语切换：顶部语言切换按钮 (中文/English)\n- 货币统一显示为 RM（马币）\n- 手机号统一 +60 格式\n- 移动端优先响应式设计\n- 预约日历使用 {booking_interval} 分钟为最小单位\n\n---\n\n## 四、模拟数据\n\n请预填以下示范数据（马来西亚美发沙龙）：\n\n**商家**：{business_name}，{business_type}，营业 {operating_hours}\n\n**员工 ({num_staff} 位)**：\n1. Ah Mei 阿美 — 资深发型师，周一至六 10:00-19:00\n2. Jason 杰森 — 发型师，周二至六 11:00-20:00\n3. Siti — 美甲师+洗头助理，周一至五 10:00-18:00\n\n**服务**：\n- 女士洗剪吹 Ladies Cut & Blow — 60min — RM68 — Ah Mei, Jason\n- 男士理发 Men's Cut — 30min — RM38 — Ah Mei, Jason\n- 染发 Hair Colouring — 120min — RM180 — Ah Mei, Jason\n- 头皮护理 Scalp Treatment — 45min — RM88 — Ah Mei, Siti\n- 美甲 Manicure — 45min — RM58 — Siti\n\n**示范预约**：生成 5 笔本周的示范预约，涵盖不同员工、服务和状态。\n\n---\n\n## 五、实现优先级\n1. 数据库 schema + RLS + 种子数据\n2. 顾客预约流程 (5步骤)\n3. 时段计算 API\n4. 管理后台仪表板\n5. 员工排班管理\n6. 顾客历史与营收报表\n7. 日历文件导出 + WhatsApp 模拟通知",
+    "prompt_body_en": "You are a senior full-stack engineer. Build a complete appointment booking system for \"{business_name}\".\nThis is a {business_type} based in Malaysia with {num_staff} staff members, operating {operating_hours}.\n\nTech stack: Next.js 16 (App Router) + Tailwind CSS 4 + Supabase (Postgres + Auth + RLS + Realtime)\n\n---\n\n## 1. Data Model (Supabase Postgres)\n\n### 1.1 businesses\n- id (uuid, PK), name, type, phone, address, operating_hours (jsonb), booking_interval ({booking_interval} minutes), cancellation_hours (how many hours before can cancel), primary_color ({primary_color}), created_at\n\n### 1.2 staff\n- id (uuid, PK), business_id (FK), name, phone, email, avatar_url, bio, is_active, sort_order, created_at\n- Index on business_id\n\n### 1.3 staff_schedules\n- id (uuid, PK), staff_id (FK), day_of_week (0-6), start_time (time), end_time (time), is_working (boolean)\n- One record per staff per day, indicating whether they work and what hours\n- Composite index on staff_id + day_of_week\n\n### 1.4 staff_breaks\n- id (uuid, PK), staff_id (FK), day_of_week, break_start (time), break_end (time)\n\n### 1.5 staff_off_days\n- id (uuid, PK), staff_id (FK), off_date (date), reason\n- Index on staff_id + off_date\n\n### 1.6 services\n- id (uuid, PK), business_id (FK), name_zh, name_en, description_zh, description_en, duration_minutes, price (numeric, MYR), category, is_active, sort_order, created_at\n\n### 1.7 staff_services (many-to-many)\n- staff_id (FK), service_id (FK), PRIMARY KEY (staff_id, service_id)\n\n### 1.8 customers\n- id (uuid, PK), business_id (FK), name, phone (format +60xxxxxxxxx), email, visit_count (default 0), total_spend (default 0), notes, first_visit_at, last_visit_at, created_at\n- Unique index on phone + business_id (no duplicate phone per business)\n\n### 1.9 bookings\n- id (uuid, PK), business_id (FK), customer_id (FK), staff_id (FK), service_id (FK)\n- booking_date (date), start_time (time), end_time (time — auto-calculated: start_time + service.duration_minutes)\n- status: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no_show'\n- total_price (numeric), notes, cancelled_at, cancel_reason\n- created_at, updated_at\n- Index: staff_id + booking_date + start_time (core anti-collision index)\n- Index: customer_id, booking_date\n- RLS: anon can INSERT (create booking), admin has full CRUD\n\n### 1.10 booking_events (audit log)\n- id (uuid, PK), booking_id (FK), event_type ('created'|'confirmed'|'cancelled'|'completed'|'reminder_sent'), metadata (jsonb), created_at\n\n---\n\n## 2. Core Business Logic\n\n### Slot Availability Algorithm (Most Critical!)\n1. Input: service_id, staff_id, target_date\n2. Query staff_schedules for the staff member's working hours on that day. If is_working=false, return empty.\n3. Query staff_off_days to confirm the staff member is not on leave that day.\n4. Generate all possible slot start times using {booking_interval}-minute intervals within working hours.\n5. For each slot: check whether start_time to end_time (start + service duration) conflicts with:\n   - Existing bookings (status IN ('pending','confirmed')) — use SQL range overlap: NOT (end_time <= existing.start_time OR start_time >= existing.end_time)\n   - Staff breaks (staff_breaks table)\n6. Filter out past times (for today's date).\n7. Return array of available slots: [{start: '10:00', end: '10:45'}, ...]\n\n### Double-Booking Prevention\n- Either use an EXCLUDE constraint on bookings table, or use SELECT ... FOR UPDATE row locking in Server Action before INSERT.\n- The booking creation Server Action MUST execute inside a transaction: lock-check-then-insert.\n\n### Cancellation Policy\n- Cannot cancel within cancellation_hours before appointment time.\n- Cancellation automatically frees the slot.\n- Log cancel reason to booking_events.\n\n### Customer Tracking\n- On each booking completion (status → completed): update customers.visit_count +1, total_spend + booking.total_price, last_visit_at via Server Action or Supabase trigger.\n\n---\n\n## 3. Pages & UI/UX\n\n### A. Customer Booking Page /book (public, no login required)\nUse {primary_color} as accent. Clean white background.\n\n**Step 1 — Select Service**\n- Service card grid showing: service name (bilingual CN/EN), duration, price (RM)\n- Click to select, highlight border\n\n**Step 2 — Select Staff**\n- Show staff members who can perform the selected service (avatar + name)\n- Option: \"No preference (any available staff)\"\n\n**Step 3 — Pick Date & Time**\n- Calendar component to pick date (disable past dates and business-wide off days)\n- After selecting date, show available time slot grid ({booking_interval}-minute intervals)\n- Full slots greyed out and unclickable, available slots clickable\n\n**Step 4 — Fill Contact Info**\n- Name, phone (+60 prefix auto-filled), email (optional), notes\n- Malaysian phone number validation\n\n**Step 5 — Confirm Booking**\n- Summary card: service, staff, date/time, price\n- Confirm button\n- On success: show booking reference number, \"Add to Calendar\" button (generate .ics file), simulated WhatsApp notification (display the message that would be sent)\n\n### B. Admin Dashboard /admin (login required)\n\n**B1. Dashboard /admin/dashboard**\n- Today's appointments list (timeline style, sorted by time)\n- Weekly calendar view (X-axis = days, Y-axis = time slots, one column per staff, bookings shown as colored blocks)\n- Stat cards: today's bookings, this week's revenue, this month's revenue, new customers count\n\n**B2. Revenue Reports /admin/revenue**\n- By service: booking count and total revenue per service\n- By staff: booking count and total revenue per staff member\n- Date range picker\n- CSV export\n\n**B3. Booking Management /admin/bookings**\n- Table: date, time, customer, service, staff, status\n- Filters: date range, status, staff\n- Actions: confirm, complete, cancel, mark as no-show\n\n**B4. Service Management /admin/services**\n- CRUD for services\n- Assign which staff members can perform each service\n\n**B5. Staff Management /admin/staff**\n- CRUD for staff\n- Edit weekly schedule per staff member (visual timetable editor)\n- Manage break times and special off-days\n\n**B6. Customer Management /admin/customers**\n- Customer list: name, phone, visit count, total spend, last visit\n- Sort by: spend amount, visit count\n- Click to view full booking history for that customer\n\n### C. Global UI Rules\n- Language toggle at top: 中文 / English\n- Currency always displayed as RM (Malaysian Ringgit)\n- Phone numbers always in +60 format\n- Mobile-first responsive design\n- Booking calendar uses {booking_interval}-minute minimum units\n\n---\n\n## 4. Sample Data\n\nPre-populate with this demo data (Malaysian hair salon):\n\n**Business**: {business_name}, {business_type}, operating {operating_hours}\n\n**Staff ({num_staff} members)**:\n1. Ah Mei 阿美 — Senior Stylist, Mon-Sat 10:00-19:00\n2. Jason 杰森 — Stylist, Tue-Sat 11:00-20:00\n3. Siti — Nail Artist & Wash Assistant, Mon-Fri 10:00-18:00\n\n**Services**:\n- Ladies Cut & Blow 女士洗剪吹 — 60min — RM68 — Ah Mei, Jason\n- Men's Cut 男士理发 — 30min — RM38 — Ah Mei, Jason\n- Hair Colouring 染发 — 120min — RM180 — Ah Mei, Jason\n- Scalp Treatment 头皮护理 — 45min — RM88 — Ah Mei, Siti\n- Manicure 美甲 — 45min — RM58 — Siti\n\n**Sample Bookings**: Generate 5 bookings for this week covering different staff, services, and statuses (confirmed, completed, pending, cancelled, no_show).\n\n---\n\n## 5. Implementation Priority\n1. Database schema + RLS policies + seed data\n2. Customer booking flow (5 steps)\n3. Slot availability API\n4. Admin dashboard\n5. Staff schedule management\n6. Customer history & revenue reports\n7. Calendar file export + simulated WhatsApp notification",
+    "preview_prompt": "Show me the customer booking page for a Malaysian hair salon called \"Glamour Studio\". Display Step 3 (date/time selection) where the customer has already selected \"Ladies Cut & Blow\" with stylist \"Ah Mei\". Show a calendar for this week and available time slots for tomorrow in 30-minute intervals, with some slots already booked (greyed out). Use a clean white design with gold (#FCD34D) accent color. Include bilingual labels (Chinese primary, English secondary). Mobile-responsive layout.",
+    "tags": [
+      "full-app",
+      "booking",
+      "scheduling",
+      "supabase",
+      "admin-dashboard",
+      "bilingual",
+      "malaysian-localization"
+    ],
+    "industries": [
+      "services",
+      "healthcare",
+      "education",
+      "general"
+    ],
+    "variables": [
+      {
+        "key": "business_name",
+        "label_en": "Business Name",
+        "label_zh": "商家名称",
+        "default_value": "Glamour Studio",
+        "default_value_en": "Glamour Studio",
+        "input_type": "text"
+      },
+      {
+        "key": "business_type",
+        "label_en": "Business Type",
+        "label_zh": "行业类型",
+        "default_value": "美发沙龙 Hair Salon",
+        "default_value_en": "美发沙龙 Hair Salon",
+        "input_type": "select"
+      },
+      {
+        "key": "num_staff",
+        "label_en": "Number of Staff",
+        "label_zh": "员工人数",
+        "default_value": "3",
+        "default_value_en": "3",
+        "input_type": "text"
+      },
+      {
+        "key": "operating_hours",
+        "label_en": "Operating Hours",
+        "label_zh": "营业时间",
+        "default_value": "周二至周日 10:00-20:00，周一休息",
+        "default_value_en": "周二至周日 10:00-20:00，周一休息",
+        "input_type": "text"
+      },
+      {
+        "key": "primary_color",
+        "label_en": "Primary Color",
+        "label_zh": "品牌主色调",
+        "default_value": "#FCD34D",
+        "default_value_en": "#FCD34D",
+        "input_type": "text"
+      },
+      {
+        "key": "booking_interval",
+        "label_en": "Booking Interval (minutes)",
+        "label_zh": "预约间隔（分钟）",
+        "default_value": "30",
+        "default_value_en": "30",
+        "input_type": "select"
+      }
+    ],
+    "related": [
+      "qr-menu-ordering-system"
+    ]
+  },
+  {
+    "slug": "inventory-pos-system",
+    "title_en": "Inventory & POS System",
+    "title_zh": "库存与收银系统",
+    "subtitle": "取代 StoreHub/Square POS，专为马来西亚零售店打造的库存管理与收银系统",
+    "category": "operations",
+    "difficulty": "hard",
+    "estimated_minutes": 120,
+    "boss_tip": "先把 POS 收银流程做好——扫码、加购物车、算 SST、结账打印收据。老板最关心的是：每天卖了多少、赚了多少、什么货快没了。库存自动扣减和低库存提醒是核心功能，做好这两个，系统就能用起来了。",
+    "prompt_body": "你是一位资深全栈开发者。请帮我用 Vibe Coding 的方式，一步一步构建一个完整的**库存与收银系统（Inventory & POS System）**。\n\n## 项目概述\n店铺名称：{store_name}\n店铺类型：{store_type}\n预计商品数量：{num_products}\n税率（SST）：{tax_rate}\n货币：{currency}\n品牌主色：{primary_color}\n\n## 技术栈\n- 前端：Next.js 16（App Router）+ Tailwind CSS 4\n- 后端/数据库：Supabase（PostgreSQL + Auth + RLS + Realtime）\n- 部署：Vercel\n- 条码扫描：浏览器原生 Camera API 或 quagga2 库\n- 打印：浏览器 window.print() + 热敏小票 CSS 样式\n\n## 数据模型（Supabase 表结构）\n\n### products 商品表\n- id (uuid, PK), sku (text, unique), name_zh (text), name_en (text)\n- category_id (uuid, FK → categories), barcode (text, unique, nullable)\n- cost_price (numeric), selling_price (numeric), image_url (text)\n- stock_quantity (integer, default 0), low_stock_threshold (integer, default 5)\n- is_active (boolean, default true), created_at, updated_at\n\n### categories 分类表\n- id (uuid, PK), name_zh (text), name_en (text), sort_order (integer)\n\n### sales 销售主表\n- id (uuid, PK), sale_number (text, unique, 格式：INV-20260409-001)\n- subtotal (numeric), discount_amount (numeric), tax_amount (numeric)\n- total (numeric), payment_method (enum: cash/card/ewallet)\n- status (enum: completed/voided/refunded)\n- location_id (uuid, FK → locations, nullable)\n- cashier_id (uuid, FK → auth.users), created_at\n\n### sale_items 销售明细表\n- id (uuid, PK), sale_id (uuid, FK → sales)\n- product_id (uuid, FK → products), quantity (integer)\n- unit_price (numeric), discount_percent (numeric, default 0)\n- line_total (numeric), created_at\n\n### stock_movements 库存变动表\n- id (uuid, PK), product_id (uuid, FK → products)\n- movement_type (enum: purchase_in/sale_out/adjustment/transfer)\n- quantity (integer, 正数=入库, 负数=出库)\n- reference_id (uuid, nullable, 关联 sale_id 或 purchase_order_id)\n- notes (text), created_at, created_by (uuid)\n\n### purchase_orders 采购单表\n- id (uuid, PK), po_number (text, unique)\n- supplier_id (uuid, FK → suppliers)\n- status (enum: draft/ordered/received/cancelled)\n- total_amount (numeric), notes (text), ordered_at, received_at\n\n### purchase_order_items 采购明细\n- id (uuid, PK), purchase_order_id (uuid, FK), product_id (uuid, FK)\n- quantity (integer), unit_cost (numeric), received_quantity (integer, default 0)\n\n### suppliers 供应商表\n- id (uuid, PK), name (text), contact_person (text)\n- phone (text), email (text), address (text)\n- last_order_date (date, nullable), notes (text)\n\n### locations 门店/仓库表（多门店支持）\n- id (uuid, PK), name (text), address (text), is_active (boolean)\n\n## 核心业务逻辑\n\n### 1. POS 收银流程\n- 通过商品名称搜索或条码扫描添加商品到购物车\n- 支持逐项折扣（百分比）和整单折扣\n- 自动计算小计、折扣、SST（{tax_rate}）、总计\n- SST 计算公式：tax = (subtotal - discount) × tax_rate\n- 选择支付方式：现金（自动算找零）、刷卡、电子钱包（TNG/GrabPay/DuitNow）\n- 结账后自动扣减库存（通过 Supabase Database Function + Trigger）\n- 生成小票（58mm/80mm 热敏格式），包含店名、商品明细、SST 税号、总计\n\n### 2. 库存自动扣减（数据库触发器）\n```sql\n-- 当 sale_items INSERT 时触发\nCREATE FUNCTION deduct_stock() RETURNS trigger AS $$\nBEGIN\n  UPDATE products SET stock_quantity = stock_quantity - NEW.quantity\n  WHERE id = NEW.product_id;\n  INSERT INTO stock_movements (product_id, movement_type, quantity, reference_id)\n  VALUES (NEW.product_id, 'sale_out', -NEW.quantity, NEW.sale_id);\n  RETURN NEW;\nEND; $$ LANGUAGE plpgsql;\n```\n\n### 3. 低库存提醒\n- 查询条件：stock_quantity <= low_stock_threshold AND is_active = true\n- Dashboard 顶部红色警告横幅显示低库存商品数量\n- 点击进入低库存商品列表，可直接创建采购单\n\n### 4. 利润计算\n- 单品利润 = selling_price - cost_price\n- 毛利率 = (selling_price - cost_price) / selling_price × 100%\n- 报表中显示每日/每周/每月的总收入、总成本、毛利润\n\n## UI/UX 设计规范\n\n### POS 收银界面（平板优化，1024px+）\n- 左侧 60%：商品网格（大按钮、商品图片、价格）+ 顶部搜索栏 + 分类筛选\n- 右侧 40%：购物车列表 + 小计/税/总计 + 支付按钮\n- 大字体（商品名 16px+，价格 20px+），方便触屏操作\n- 支付弹窗：选择支付方式 → 确认 → 打印小票\n\n### 后台管理界面（桌面端）\n- 侧边栏导航：仪表盘、商品管理、库存管理、销售记录、采购管理、供应商、报表、设置\n- 仪表盘：今日销售额、订单数、毛利润、低库存提醒\n- 商品管理：表格 + 搜索 + 筛选 + 批量操作\n- 报表页：日期范围选择器 + 柱状图 + 明细表格\n\n### 本地化\n- 界面语言：中文为主，英文为辅（双语切换）\n- 货币格式：{currency} 1,234.00\n- 日期格式：2026年4月9日 / 09/04/2026\n\n## 示例数据（{store_name} — 手机配件店）\n\n### 分类\n手机壳、充电器、数据线、耳机、屏幕保护膜、其他配件\n\n### 商品示例\n| SKU | 中文名 | 英文名 | 成本价 | 售价 | 库存 | 低库存阈值 |\n|-----|--------|--------|--------|------|------|------------|\n| ACC-001 | iPhone 15 透明手机壳 | iPhone 15 Clear Case | 5.00 | 19.90 | 50 | 10 |\n| CHG-001 | 20W USB-C 快充头 | 20W USB-C Charger | 12.00 | 39.90 | 30 | 5 |\n| CBL-001 | 1m USB-C 数据线 | 1m USB-C Cable | 3.00 | 15.90 | 100 | 15 |\n| EAR-001 | 蓝牙耳机 A1 | Bluetooth Earbuds A1 | 25.00 | 79.90 | 20 | 5 |\n| SPF-001 | iPhone 15 钢化膜 | iPhone 15 Screen Protector | 2.00 | 12.90 | 80 | 20 |\n\n### 供应商示例\n| 供应商 | 联系人 | 供应商品 |\n|--------|--------|----------|\n| 深圳优品科技 | 陈经理 | 手机壳、屏幕保护膜 |\n| KL Digital Supply | Ahmad | 充电器、数据线 |\n\n## RLS 安全策略\n- products/categories：anon 可 SELECT（POS 需要读取）\n- sales/sale_items：authenticated 可 INSERT/SELECT\n- 所有写操作限制 authenticated 且 email 在 admin 白名单中\n- stock_movements：通过 trigger 自动写入，admin 可查询\n\n## 页面路由\n- / — 登录页\n- /pos — POS 收银终端\n- /dashboard — 管理仪表盘\n- /products — 商品管理\n- /inventory — 库存管理\n- /sales — 销售记录\n- /reports — 销售报表\n- /suppliers — 供应商管理\n- /purchase-orders — 采购管理\n- /settings — 系统设置\n\n请从数据库表结构和 Supabase 配置开始，然后构建 POS 收银界面，最后完成后台管理模块。每个步骤都要给出完整可运行的代码。",
+    "prompt_body_en": "You are a senior full-stack developer. Help me build a complete **Inventory & POS System** step by step using the Vibe Coding approach.\n\n## Project Overview\nStore name: {store_name}\nStore type: {store_type}\nEstimated products: {num_products}\nTax rate (SST): {tax_rate}\nCurrency: {currency}\nBrand primary color: {primary_color}\n\n## Tech Stack\n- Frontend: Next.js 16 (App Router) + Tailwind CSS 4\n- Backend/Database: Supabase (PostgreSQL + Auth + RLS + Realtime)\n- Deployment: Vercel\n- Barcode scanning: Browser Camera API or quagga2 library\n- Receipt printing: Browser window.print() + thermal receipt CSS layout\n\n## Data Model (Supabase Tables)\n\n### products\n- id (uuid, PK), sku (text, unique), name_zh (text), name_en (text)\n- category_id (uuid, FK → categories), barcode (text, unique, nullable)\n- cost_price (numeric), selling_price (numeric), image_url (text)\n- stock_quantity (integer, default 0), low_stock_threshold (integer, default 5)\n- is_active (boolean, default true), created_at, updated_at\n\n### categories\n- id (uuid, PK), name_zh (text), name_en (text), sort_order (integer)\n\n### sales\n- id (uuid, PK), sale_number (text, unique, format: INV-20260409-001)\n- subtotal (numeric), discount_amount (numeric), tax_amount (numeric)\n- total (numeric), payment_method (enum: cash/card/ewallet)\n- status (enum: completed/voided/refunded)\n- location_id (uuid, FK → locations, nullable)\n- cashier_id (uuid, FK → auth.users), created_at\n\n### sale_items\n- id (uuid, PK), sale_id (uuid, FK → sales)\n- product_id (uuid, FK → products), quantity (integer)\n- unit_price (numeric), discount_percent (numeric, default 0)\n- line_total (numeric), created_at\n\n### stock_movements\n- id (uuid, PK), product_id (uuid, FK → products)\n- movement_type (enum: purchase_in/sale_out/adjustment/transfer)\n- quantity (integer, positive = stock in, negative = stock out)\n- reference_id (uuid, nullable, links to sale_id or purchase_order_id)\n- notes (text), created_at, created_by (uuid)\n\n### purchase_orders\n- id (uuid, PK), po_number (text, unique)\n- supplier_id (uuid, FK → suppliers)\n- status (enum: draft/ordered/received/cancelled)\n- total_amount (numeric), notes (text), ordered_at, received_at\n\n### purchase_order_items\n- id (uuid, PK), purchase_order_id (uuid, FK), product_id (uuid, FK)\n- quantity (integer), unit_cost (numeric), received_quantity (integer, default 0)\n\n### suppliers\n- id (uuid, PK), name (text), contact_person (text)\n- phone (text), email (text), address (text)\n- last_order_date (date, nullable), notes (text)\n\n### locations (multi-location support)\n- id (uuid, PK), name (text), address (text), is_active (boolean)\n\n## Core Business Logic\n\n### 1. POS Checkout Flow\n- Search products by name or scan barcode to add to cart\n- Support per-item discount (percentage) and whole-order discount\n- Auto-calculate subtotal, discount, SST ({tax_rate}), and grand total\n- SST formula: tax = (subtotal - discount) x tax_rate\n- Select payment method: Cash (auto-calculate change), Card, E-wallet (TNG/GrabPay/DuitNow)\n- On checkout, auto-deduct stock via Supabase Database Function + Trigger\n- Generate receipt (58mm/80mm thermal format) with store name, item details, SST registration number, total\n\n### 2. Automatic Stock Deduction (Database Trigger)\n```sql\n-- Triggered on sale_items INSERT\nCREATE FUNCTION deduct_stock() RETURNS trigger AS $$\nBEGIN\n  UPDATE products SET stock_quantity = stock_quantity - NEW.quantity\n  WHERE id = NEW.product_id;\n  INSERT INTO stock_movements (product_id, movement_type, quantity, reference_id)\n  VALUES (NEW.product_id, 'sale_out', -NEW.quantity, NEW.sale_id);\n  RETURN NEW;\nEND; $$ LANGUAGE plpgsql;\n```\n\n### 3. Low Stock Alerts\n- Query: stock_quantity <= low_stock_threshold AND is_active = true\n- Red alert banner at top of dashboard showing count of low-stock products\n- Click to view low-stock list, with quick action to create purchase order\n\n### 4. Profit Calculation\n- Per-item profit = selling_price - cost_price\n- Gross margin = (selling_price - cost_price) / selling_price x 100%\n- Reports show daily/weekly/monthly total revenue, total cost, gross profit\n\n## UI/UX Design Specs\n\n### POS Terminal (Tablet-optimized, 1024px+)\n- Left 60%: Product grid (large tap targets, product images, prices) + top search bar + category filters\n- Right 40%: Cart list + subtotal/tax/total + payment buttons\n- Large fonts (product name 16px+, prices 20px+) for easy touch interaction\n- Payment modal: select method → confirm → print receipt\n\n### Admin Dashboard (Desktop)\n- Sidebar navigation: Dashboard, Products, Inventory, Sales, Purchasing, Suppliers, Reports, Settings\n- Dashboard: today's revenue, order count, gross profit, low stock alerts\n- Products: data table + search + filters + bulk actions\n- Reports: date range picker + bar charts + detail tables\n\n### Localization\n- UI language: Chinese primary, English secondary (bilingual toggle)\n- Currency format: {currency} 1,234.00\n- Date format: 2026-04-09 / 09/04/2026\n\n## Sample Data ({store_name} — Phone Accessories Shop)\n\n### Categories\nPhone Cases, Chargers, Cables, Earphones, Screen Protectors, Other Accessories\n\n### Sample Products\n| SKU | Chinese Name | English Name | Cost | Price | Stock | Low Threshold |\n|-----|-------------|--------------|------|-------|-------|---------------|\n| ACC-001 | iPhone 15 透明手机壳 | iPhone 15 Clear Case | 5.00 | 19.90 | 50 | 10 |\n| CHG-001 | 20W USB-C 快充头 | 20W USB-C Charger | 12.00 | 39.90 | 30 | 5 |\n| CBL-001 | 1m USB-C 数据线 | 1m USB-C Cable | 3.00 | 15.90 | 100 | 15 |\n| EAR-001 | 蓝牙耳机 A1 | Bluetooth Earbuds A1 | 25.00 | 79.90 | 20 | 5 |\n| SPF-001 | iPhone 15 钢化膜 | iPhone 15 Screen Protector | 2.00 | 12.90 | 80 | 20 |\n\n### Sample Suppliers\n| Supplier | Contact | Products Supplied |\n|----------|---------|-------------------|\n| 深圳优品科技 | Manager Chen | Phone cases, Screen protectors |\n| KL Digital Supply | Ahmad | Chargers, Cables |\n\n## RLS Security Policies\n- products/categories: anon can SELECT (POS needs read access)\n- sales/sale_items: authenticated can INSERT/SELECT\n- All write operations restricted to authenticated users with email in admin allowlist\n- stock_movements: auto-inserted via trigger, admin can query\n\n## Page Routes\n- / — Login page\n- /pos — POS terminal\n- /dashboard — Admin dashboard\n- /products — Product management\n- /inventory — Inventory management\n- /sales — Sales history\n- /reports — Sales reports\n- /suppliers — Supplier management\n- /purchase-orders — Purchase order management\n- /settings — System settings\n\nStart with the database schema and Supabase configuration, then build the POS terminal interface, and finally complete the admin management modules. Provide complete, runnable code for each step.",
+    "preview_prompt": "帮我用 Next.js 16 + Supabase 构建一个库存与收银系统。店铺名称：JT Phone Accessories，商品约 200 个，SST 税率 6%，货币 MYR，品牌主色 #FCD34D。需要 POS 收银、库存管理、采购管理、销售报表，支持中英双语。",
+    "tags": [
+      "full-app",
+      "retail-tool",
+      "pos",
+      "inventory",
+      "supabase",
+      "bilingual"
+    ],
+    "industries": [
+      "retail",
+      "general"
+    ],
+    "variables": [
+      {
+        "key": "store_name",
+        "label_en": "Store Name",
+        "label_zh": "店铺名称",
+        "default_value": "JT Phone Accessories",
+        "default_value_en": "JT Phone Accessories",
+        "input_type": "text"
+      },
+      {
+        "key": "store_type",
+        "label_en": "Store Type",
+        "label_zh": "店铺类型",
+        "default_value": "手机配件零售店",
+        "default_value_en": "手机配件零售店",
+        "input_type": "text"
+      },
+      {
+        "key": "num_products",
+        "label_en": "Estimated Number of Products",
+        "label_zh": "预计商品数量",
+        "default_value": "200",
+        "default_value_en": "200",
+        "input_type": "text"
+      },
+      {
+        "key": "tax_rate",
+        "label_en": "Tax Rate (SST)",
+        "label_zh": "税率（SST）",
+        "default_value": "6%",
+        "default_value_en": "6%",
+        "input_type": "text"
+      },
+      {
+        "key": "currency",
+        "label_en": "Currency",
+        "label_zh": "货币",
+        "default_value": "MYR",
+        "default_value_en": "MYR",
+        "input_type": "text"
+      },
+      {
+        "key": "primary_color",
+        "label_en": "Brand Primary Color",
+        "label_zh": "品牌主色",
+        "default_value": "#FCD34D",
+        "default_value_en": "#FCD34D",
+        "input_type": "text"
+      }
+    ],
+    "related": [
+      "qr-menu-ordering-system"
+    ]
+  },
+  {
+    "slug": "invoice-payment-tracker",
+    "title_en": "Invoice & Payment Tracker",
+    "title_zh": "发票与收款追踪系统",
+    "subtitle": "替代 SQL Accounting / Excel 的专业发票管理系统，支持 SST 税务、账龄分析、自动催款提醒",
+    "category": "finance",
+    "difficulty": "hard",
+    "estimated_minutes": 90,
+    "boss_tip": "先用 3 个样本客户测试完整流程：开发票 → 发送 → 记录收款 → 查看报表。确认 SST 计算和账龄分析正确后，再加入你的真实公司资料和银行信息。这个系统可以直接取代你每月花几小时用 Excel 手动追账的工作。",
+    "prompt_body": "你是一位资深全栈工程师。请帮我搭建一个完整的「发票与收款追踪系统」，专为马来西亚中小企业（Sdn Bhd）设计。\n\n## 技术栈\n- Next.js 16（App Router）+ TypeScript\n- Tailwind CSS 4\n- Supabase（Postgres 数据库 + Auth 认证 + Row Level Security）\n- 部署在 Vercel\n\n## 公司资料变量\n- 公司名称：{company_name}\n- 公司地址：{company_address}\n- 联系电话：{company_phone}\n- 公司邮箱：{company_email}\n- 税率（SST）：{tax_rate}\n- 货币：{currency}\n- 付款条款：{payment_terms}\n- 品牌主色：{primary_color}\n\n## 数据模型（Supabase Postgres）\n\n### clients 表\n- id (uuid, PK), company_name (text), contact_person (text), email (text), phone (text)\n- address (text), city (text), state (text), postcode (text)\n- outstanding_balance (numeric, 默认 0), notes (text)\n- created_at (timestamptz), updated_at (timestamptz)\n\n### invoices 表\n- id (uuid, PK), invoice_number (text, 唯一, 格式: INV-2026-0001)\n- client_id (uuid, FK → clients), status (enum: draft/sent/viewed/paid/overdue)\n- issue_date (date), due_date (date), payment_terms (text)\n- subtotal (numeric), tax_rate (numeric), tax_amount (numeric), total (numeric)\n- amount_paid (numeric, 默认 0), balance_due (numeric, 计算字段)\n- notes (text), is_recurring (boolean), recurring_interval (text: monthly/quarterly)\n- created_at (timestamptz), updated_at (timestamptz)\n- 创建索引：client_id, status, due_date, invoice_number\n\n### invoice_items 表\n- id (uuid, PK), invoice_id (uuid, FK → invoices)\n- description (text), quantity (numeric), unit_price (numeric), amount (numeric)\n- sort_order (integer)\n\n### payments 表\n- id (uuid, PK), invoice_id (uuid, FK → invoices)\n- amount (numeric), payment_date (date)\n- payment_method (enum: bank_transfer/cash/cheque/ewallet/credit_card)\n- reference_number (text), notes (text)\n- created_at (timestamptz)\n\n### 数据库函数与触发器\n1. 自动生成发票编号：按年份递增 INV-YYYY-NNNN\n2. 付款记录后自动更新 invoices.amount_paid 和 balance_due\n3. 付款后如 balance_due = 0，自动将 status 设为 paid\n4. 每日检查 due_date < today 且 status = sent/viewed 的发票，标记为 overdue\n5. 更新 clients.outstanding_balance（所有未付发票的 balance_due 总和）\n\n## 业务逻辑\n\n### SST 税务计算\n- 小计 = Σ(数量 × 单价)\n- SST 税额 = 小计 × {tax_rate}%\n- 总额 = 小计 + SST 税额\n- 所有金额保留两位小数，使用银行家舍入法\n\n### 账龄分析（Aging Report）\n- 当前（未到期）：due_date >= today\n- 30天内逾期：today - due_date 在 1-30 天\n- 60天内逾期：today - due_date 在 31-60 天\n- 90天以上逾期：today - due_date > 60 天\n- 每个区间显示发票数量和金额总计\n\n### 逾期提醒（模拟）\n- 到期前 3 天：显示黄色提醒标签\n- 逾期 1 天：自动标记 overdue，显示红色标签\n- 逾期 7 天 / 30 天 / 60 天：在仪表板显示催款建议\n- 提供「生成催款邮件」按钮（生成邮件内容，用户手动发送）\n\n### 循环发票\n- 标记发票为「每月循环」或「每季循环」\n- 在仪表板显示下次自动生成日期\n- 提供「立即生成下期发票」按钮，复制所有明细项\n\n## 页面与 UI 设计\n\n### 1. 仪表板 /dashboard\n- 四个汇总卡片：本月收入、应收总额、逾期金额、客户数\n- 月度收入柱状图（最近 12 个月）\n- 账龄分析表格（当前/30/60/90天）\n- 最近 5 笔发票列表\n- 逾期提醒列表\n\n### 2. 发票列表 /invoices\n- 表格显示：发票号、客户、日期、金额、状态、操作\n- 按状态筛选（全部/草稿/已发送/已查看/已付/逾期）\n- 搜索（按客户名或发票号）\n- 状态用彩色 Badge：draft=灰色, sent=蓝色, viewed=紫色, paid=绿色, overdue=红色\n\n### 3. 创建/编辑发票 /invoices/new 和 /invoices/[id]/edit\n- 顶部：公司 logo 和信息（来自变量）\n- 客户选择（下拉搜索）或新增客户\n- 明细项：可动态增减行，每行有描述、数量、单价、金额（自动计算）\n- 底部：小计、SST ({tax_rate}%)、总额\n- 付款条款、到期日、备注\n- 保存为草稿 / 标记已发送\n\n### 4. 发票详情 /invoices/[id]\n- 专业 PDF 风格排版，可直接打印（@media print 优化）\n- 公司抬头：{company_name}、地址、电话、邮箱\n- 客户信息、发票编号、日期\n- 明细项表格\n- 小计、SST、总额\n- 付款记录列表\n- 银行转账信息区域（马来西亚银行格式）\n- 操作按钮：打印、记录收款、发送提醒、编辑\n\n### 5. 客户管理 /clients\n- 客户列表：公司名、联系人、应收余额\n- 客户详情：基本信息 + 该客户所有发票历史 + 付款历史\n\n### 6. 收款记录 /payments\n- 付款列表：日期、发票号、客户、金额、方式、参考号\n- 记录收款弹窗：选择发票、输入金额（支持部分付款）、付款方式、日期、参考号\n\n## 样本数据\n\n### 3 个马来西亚客户\n1. Syarikat Maju Jaya Sdn Bhd — 联系人: Tan Ah Kow, Kuala Lumpur\n2. Perniagaan Sri Rezeki Enterprise — 联系人: Ahmad bin Ismail, Penang\n3. Golden Harvest Trading Sdn Bhd — 联系人: Lim Mei Ling, Johor Bahru\n\n### 5 张样本发票\n1. INV-2026-0001 → Maju Jaya, RM 5,300.00, 已付\n2. INV-2026-0002 → Sri Rezeki, RM 2,120.00, 逾期 15 天\n3. INV-2026-0003 → Golden Harvest, RM 8,480.00, 已发送\n4. INV-2026-0004 → Maju Jaya, RM 3,710.00, 草稿\n5. INV-2026-0005 → Sri Rezeki, RM 1,590.00, 部分付款 RM 500\n\n## 设计风格\n- 主色：{primary_color}，搭配 slate 灰色文字\n- 白色背景，卡片用细边框和微阴影\n- Inter 字体（英文）+ Noto Sans SC（中文）\n- 发票预览用深色 navy (#0F172A) 区块突出公司抬头\n- 响应式设计，支持手机查看发票\n\n## 重要要求\n- 所有金额显示格式：RM 1,234.56\n- 发票编号自动递增，不可重复\n- 支持部分付款，自动计算余额\n- 发票打印视图隐藏导航和按钮\n- RLS 策略：只有认证用户可读写所有数据\n- 创建完整的 Supabase migration SQL 文件\n- 包含 seed 数据脚本插入样本客户和发票",
+    "prompt_body_en": "You are a senior full-stack engineer. Build me a complete Invoice & Payment Tracker system designed specifically for Malaysian SMEs (Sdn Bhd companies).\n\n## Tech Stack\n- Next.js 16 (App Router) + TypeScript\n- Tailwind CSS 4\n- Supabase (Postgres database + Auth + Row Level Security)\n- Deploy on Vercel\n\n## Company Variables\n- Company name: {company_name}\n- Company address: {company_address}\n- Phone: {company_phone}\n- Email: {company_email}\n- Tax rate (SST): {tax_rate}\n- Currency: {currency}\n- Payment terms: {payment_terms}\n- Brand primary color: {primary_color}\n\n## Data Model (Supabase Postgres)\n\n### clients table\n- id (uuid, PK), company_name (text), contact_person (text), email (text), phone (text)\n- address (text), city (text), state (text), postcode (text)\n- outstanding_balance (numeric, default 0), notes (text)\n- created_at (timestamptz), updated_at (timestamptz)\n\n### invoices table\n- id (uuid, PK), invoice_number (text, unique, format: INV-2026-0001)\n- client_id (uuid, FK → clients), status (enum: draft/sent/viewed/paid/overdue)\n- issue_date (date), due_date (date), payment_terms (text)\n- subtotal (numeric), tax_rate (numeric), tax_amount (numeric), total (numeric)\n- amount_paid (numeric, default 0), balance_due (numeric, computed)\n- notes (text), is_recurring (boolean), recurring_interval (text: monthly/quarterly)\n- created_at (timestamptz), updated_at (timestamptz)\n- Create indexes on: client_id, status, due_date, invoice_number\n\n### invoice_items table\n- id (uuid, PK), invoice_id (uuid, FK → invoices)\n- description (text), quantity (numeric), unit_price (numeric), amount (numeric)\n- sort_order (integer)\n\n### payments table\n- id (uuid, PK), invoice_id (uuid, FK → invoices)\n- amount (numeric), payment_date (date)\n- payment_method (enum: bank_transfer/cash/cheque/ewallet/credit_card)\n- reference_number (text), notes (text)\n- created_at (timestamptz)\n\n### Database Functions & Triggers\n1. Auto-generate invoice numbers: increment per year as INV-YYYY-NNNN\n2. After payment insert, auto-update invoices.amount_paid and balance_due\n3. When balance_due reaches 0, auto-set status to paid\n4. Daily check: mark invoices as overdue where due_date < today and status is sent/viewed\n5. Update clients.outstanding_balance (sum of all unpaid invoice balance_due)\n\n## Business Logic\n\n### SST Tax Calculation\n- Subtotal = SUM(quantity x unit_price) for all line items\n- SST amount = subtotal x {tax_rate}%\n- Total = subtotal + SST amount\n- All amounts to 2 decimal places using banker's rounding\n\n### Aging Report Calculation\n- Current (not yet due): due_date >= today\n- 1-30 days overdue: today - due_date between 1 and 30\n- 31-60 days overdue: today - due_date between 31 and 60\n- 60+ days overdue: today - due_date > 60\n- Show invoice count and total amount per aging bucket\n\n### Overdue Reminder System (Simulated)\n- 3 days before due: show yellow warning badge\n- 1 day overdue: auto-mark as overdue, show red badge\n- 7 / 30 / 60 days overdue: show escalation notices on dashboard\n- Provide a \"Generate Reminder Email\" button (generates email body text for manual sending)\n\n### Recurring Invoices\n- Mark any invoice as monthly or quarterly recurring\n- Show next generation date on dashboard\n- \"Generate Next Invoice\" button to clone all line items into a new invoice\n\n## Pages & UI Design\n\n### 1. Dashboard /dashboard\n- Four summary cards: Monthly Revenue, Total Outstanding, Overdue Amount, Client Count\n- Monthly revenue bar chart (last 12 months)\n- Aging report table (Current / 30 / 60 / 90 day buckets)\n- Recent 5 invoices list\n- Overdue alerts list\n\n### 2. Invoice List /invoices\n- Table view: invoice number, client, date, amount, status, actions\n- Filter by status (All / Draft / Sent / Viewed / Paid / Overdue)\n- Search by client name or invoice number\n- Color-coded status badges: draft=gray, sent=blue, viewed=purple, paid=green, overdue=red\n\n### 3. Create/Edit Invoice /invoices/new and /invoices/[id]/edit\n- Top section: company logo and details (from variables)\n- Client selector (searchable dropdown) or quick-add new client\n- Line items: dynamically add/remove rows, each with description, quantity, unit price, amount (auto-calculated)\n- Bottom: subtotal, SST ({tax_rate}%), total\n- Payment terms, due date, notes fields\n- Save as Draft / Mark as Sent buttons\n\n### 4. Invoice Detail /invoices/[id]\n- Professional PDF-style layout, print-optimized (@media print hides nav and action buttons)\n- Company header: {company_name}, address, phone, email\n- Client info, invoice number, dates\n- Line items table with alternating row colors\n- Subtotal, SST, Total\n- Payment history section\n- Bank transfer details section (Malaysian bank format)\n- Action buttons: Print, Record Payment, Send Reminder, Edit\n\n### 5. Client Management /clients\n- Client list: company name, contact person, outstanding balance\n- Client detail: basic info + all invoice history + payment history for that client\n\n### 6. Payment Records /payments\n- Payment list: date, invoice number, client, amount, method, reference\n- Record Payment modal: select invoice, enter amount (supports partial payment), payment method, date, reference number\n\n## Sample Data\n\n### 3 Malaysian Clients\n1. Syarikat Maju Jaya Sdn Bhd — Contact: Tan Ah Kow, Kuala Lumpur\n2. Perniagaan Sri Rezeki Enterprise — Contact: Ahmad bin Ismail, Penang\n3. Golden Harvest Trading Sdn Bhd — Contact: Lim Mei Ling, Johor Bahru\n\n### 5 Sample Invoices\n1. INV-2026-0001 → Maju Jaya, RM 5,300.00, Paid\n2. INV-2026-0002 → Sri Rezeki, RM 2,120.00, Overdue by 15 days\n3. INV-2026-0003 → Golden Harvest, RM 8,480.00, Sent\n4. INV-2026-0004 → Maju Jaya, RM 3,710.00, Draft\n5. INV-2026-0005 → Sri Rezeki, RM 1,590.00, Partially paid RM 500\n\n## Design Style\n- Primary color: {primary_color}, paired with slate gray text\n- White background, cards with subtle borders and light shadows\n- Inter font (English) + Noto Sans SC (Chinese)\n- Invoice preview uses dark navy (#0F172A) blocks for company header\n- Fully responsive — invoices viewable on mobile\n\n## Critical Requirements\n- All amounts formatted as: RM 1,234.56\n- Invoice numbers auto-increment, must be unique\n- Support partial payments with automatic balance calculation\n- Print view hides navigation and action buttons\n- RLS policies: only authenticated users can read/write all data\n- Generate complete Supabase migration SQL file\n- Include seed data script with sample clients and invoices",
+    "preview_prompt": "Show me the invoice detail page for INV-2026-0003 (Golden Harvest Trading, RM 8,480.00, status: Sent) with the full professional PDF-style layout, company header, line items table, SST calculation, and bank details section.",
+    "tags": [
+      "full-app",
+      "finance-tool",
+      "invoicing",
+      "payment-tracking",
+      "supabase",
+      "dashboard"
+    ],
+    "industries": [
+      "general",
+      "services",
+      "retail",
+      "consulting",
+      "wholesale"
+    ],
+    "variables": [
+      {
+        "key": "company_name",
+        "label_en": "Company Name",
+        "label_zh": "公司名称",
+        "default_value": "",
+        "default_value_en": "",
+        "input_type": "text"
+      },
+      {
+        "key": "company_address",
+        "label_en": "Company Address",
+        "label_zh": "公司地址",
+        "default_value": "",
+        "default_value_en": "",
+        "input_type": "text"
+      },
+      {
+        "key": "company_phone",
+        "label_en": "Company Phone",
+        "label_zh": "联系电话",
+        "default_value": "",
+        "default_value_en": "",
+        "input_type": "text"
+      },
+      {
+        "key": "company_email",
+        "label_en": "Company Email",
+        "label_zh": "公司邮箱",
+        "default_value": "",
+        "default_value_en": "",
+        "input_type": "text"
+      },
+      {
+        "key": "tax_rate",
+        "label_en": "SST Tax Rate (%)",
+        "label_zh": "SST 税率 (%)",
+        "default_value": "",
+        "default_value_en": "",
+        "input_type": "text"
+      },
+      {
+        "key": "currency",
+        "label_en": "Currency",
+        "label_zh": "货币",
+        "default_value": "",
+        "default_value_en": "",
+        "input_type": "text"
+      },
+      {
+        "key": "payment_terms",
+        "label_en": "Payment Terms",
+        "label_zh": "付款条款",
+        "default_value": "",
+        "default_value_en": "",
+        "input_type": "text"
+      },
+      {
+        "key": "primary_color",
+        "label_en": "Brand Primary Color",
+        "label_zh": "品牌主色",
+        "default_value": "",
+        "default_value_en": "",
+        "input_type": "text"
+      }
+    ],
+    "related": []
+  },
+  {
+    "slug": "customer-loyalty-system",
+    "title_en": "Customer Loyalty & Rewards System",
+    "title_zh": "客户忠诚度积分奖励系统",
+    "subtitle": "取代实体印花卡，用数码积分系统留住回头客、提升复购率",
+    "category": "marketing",
+    "difficulty": "hard",
+    "estimated_minutes": 90,
+    "boss_tip": "先上线最简单的「扫码积分 + 兑换奖励」流程，确保顾客第一次体验顺畅。等会员超过200人后，再开启等级制度和生日营销活动。积分比例建议从 RM1 = 1分 开始，日后可以调整但不要一开始就设太复杂。",
+    "prompt_body": "你是一位资深全栈工程师，精通 Next.js 16、Tailwind CSS 4 和 Supabase。请为 {business_name}（一家马来西亚{business_type}）构建一套完整的客户忠诚度积分奖励系统，取代传统实体印花卡。\n\n技术栈：Next.js 16 (App Router) + TypeScript + Tailwind CSS 4 + shadcn/ui + Supabase (Postgres + Auth + RLS + Realtime)\n\n## 一、数据库模型（Supabase Postgres）\n\n### 表结构\n1. `members` — 会员资料\n   - id (uuid, PK), phone (text, unique, +60格式), name (text), email (text, nullable)\n   - tier (enum: 'bronze','silver','gold'), total_spend (numeric), total_points_earned (int)\n   - current_points (int), birthday_month (int, 1-12), referral_code (text, unique)\n   - referred_by (uuid, FK → members.id, nullable), notes (text, nullable)\n   - joined_at (timestamptz), last_visit_at (timestamptz)\n\n2. `transactions` — 消费记录\n   - id (uuid, PK), member_id (uuid, FK → members.id)\n   - amount_myr (numeric), points_earned (int), multiplier (numeric, default 1.0)\n   - source (enum: 'purchase','referral','birthday','campaign','manual','welcome')\n   - description (text, nullable), created_at (timestamptz), created_by (uuid, nullable)\n\n3. `rewards` — 奖励目录\n   - id (uuid, PK), name_zh (text), name_en (text), description_zh (text), description_en (text)\n   - points_cost (int), category (text), image_url (text, nullable)\n   - min_tier (enum: 'bronze','silver','gold'), is_active (boolean), stock (int, nullable)\n   - valid_days (int, default 30), created_at (timestamptz)\n\n4. `redemptions` — 兑换记录\n   - id (uuid, PK), member_id (uuid, FK), reward_id (uuid, FK)\n   - points_spent (int), status (enum: 'pending','fulfilled','expired','cancelled')\n   - voucher_code (text, unique), expires_at (timestamptz)\n   - fulfilled_at (timestamptz, nullable), created_at (timestamptz)\n\n5. `campaigns` — 营销活动\n   - id (uuid, PK), name (text), type (enum: 'double_points','bonus_points','birthday','welcome')\n   - multiplier (numeric, nullable), bonus_points (int, nullable)\n   - start_date (date), end_date (date), is_active (boolean)\n   - conditions (jsonb), created_at (timestamptz)\n\n6. `events` — 行为追踪\n   - id (uuid, PK), member_id (uuid, nullable), event_type (text)\n   - metadata (jsonb), created_at (timestamptz)\n\n### 索引\n- members: phone, referral_code, tier, birthday_month\n- transactions: member_id, created_at, source\n- redemptions: member_id, status, voucher_code\n- campaigns: is_active, type, start_date, end_date\n\n### RLS 策略\n- 会员只能查看自己的数据（通过 phone 验证）\n- 公开读取 rewards（is_active = true）\n- 管理员（authenticated + admins 白名单）拥有全部读写权限\n- events 表允许 anon INSERT，仅 admin SELECT\n\n## 二、积分与等级业务逻辑\n\n### 积分计算\n- 基础：每消费 RM1 获得 {points_per_rm} 积分（四舍五入）\n- 新会员欢迎奖励：注册即送 {welcome_bonus} 积分\n- 推荐奖励：推荐人和被推荐人各得 50 积分\n- 生日月：该月所有消费积分 ×2\n- 活动加倍：根据 campaigns 表的 multiplier 叠加\n- 手动调整：管理员可增减积分并记录原因\n\n### 等级制度\n- Bronze（铜牌）：默认，总消费 RM0+\n- Silver（银牌）：总消费达 RM{tier_thresholds} 中的 silver 值\n- Gold（金牌）：总消费达 RM{tier_thresholds} 中的 gold 值\n- 等级权益：Silver 积分 ×1.2 倍率，Gold 积分 ×1.5 倍率\n- 等级升降：每月1日自动评估，降级需连续3个月未达标\n\n### 奖励兑换流程\n1. 会员浏览奖励目录（按等级过滤可兑换项）\n2. 选择奖励 → 检查积分余额 ≥ points_cost\n3. 扣除积分 → 生成唯一 voucher_code（6位字母数字）\n4. 兑换券有效期 = valid_days 天\n5. 店员扫描/输入 voucher_code → 标记 fulfilled\n\n## 三、客户端界面（Mobile-First PWA）\n\n### 页面结构\n1. **首页/签到页** `/` \n   - 显示 {business_name} Logo 和品牌色 {primary_color}\n   - 两个入口：「扫QR码签到」和「输入手机号码」\n   - 新用户 → 注册流程（姓名 + 手机 +60 格式 + 生日月份）\n   - 返回用户 → 直接进入会员主页\n\n2. **会员主页** `/member`\n   - 顶部卡片：姓名、等级徽章（铜/银/金）、当前积分（大字）\n   - 进度条：距离下一等级还需消费 RMxx\n   - 快捷操作：「查看奖励」「兑换记录」「推荐朋友」\n   - 最近交易列表（最近5笔）\n\n3. **奖励目录** `/rewards`\n   - 网格卡片布局，每张卡片：奖励名称（中/英）、所需积分、等级要求\n   - 积分不足的奖励灰显但可见（激励消费）\n   - 点击 → 奖励详情 → 「立即兑换」按钮\n\n4. **兑换记录** `/history`\n   - 分标签：「积分记录」和「兑换记录」\n   - 积分记录：日期、来源、积分变动（+/-）、余额\n   - 兑换记录：奖励名、兑换码、状态、到期日\n\n5. **推荐页** `/referral`\n   - 显示个人推荐码和分享链接\n   - 分享按钮（WhatsApp、复制链接）\n   - 已成功推荐人数和获得积分\n\n### UI/UX 设计规范\n- 主色调：{primary_color}，配合白色背景和深灰文字\n- 字体：Inter（英文）+ Noto Sans SC（中文），中文优先显示\n- 积分数字用大号加粗，等级徽章用圆形 pill 样式\n- 所有金额显示 RM 前缀，千位分隔符\n- 按钮圆角 rounded-xl，卡片带轻微阴影\n- 加载状态用 Skeleton 组件，操作成功用 Sonner toast\n\n## 四、管理后台（Desktop）\n\n### Dashboard `/admin`\n- 四张统计卡片：总会员数、本月活跃、今日发放积分、今日兑换积分\n- 趋势图：过去30天新会员注册量（按日）\n- 最近交易列表（实时更新，用 Supabase Realtime）\n\n### 会员管理 `/admin/members`\n- 搜索栏：按手机号或姓名搜索\n- 表格：姓名、手机、等级、积分余额、总消费、最后到访\n- 点击行 → Sheet 侧边栏：完整资料、交易历史、手动调整积分、添加备注\n- 筛选器：按等级、注册日期范围\n\n### 奖励管理 `/admin/rewards`\n- 奖励列表 + 「新增奖励」按钮\n- 编辑表单：中英文名称、积分价格、最低等级、库存、有效天数\n- 开关：启用/停用\n\n### 活动管理 `/admin/campaigns`\n- 活动列表：名称、类型、日期范围、状态\n- 新增活动：选择类型（双倍积分/额外积分/生日/欢迎）\n- 设置条件：日期范围、倍率或额外积分数\n\n### 核销页 `/admin/redeem`\n- 输入框：输入或扫描兑换码\n- 显示：会员姓名、奖励内容、到期日\n- 「确认核销」按钮\n\n### 数据分析 `/admin/analytics`\n- 留存率：首月回访率、三月回访率\n- 平均到访频率：按周/月\n- 兑换率：发放积分 vs 兑换积分比例\n- 会员 vs 非会员营收对比（需手动输入非会员数据或估算）\n- 等级分布饼图：Bronze / Silver / Gold 人数占比\n- 热门奖励排行榜\n\n## 五、示例数据（马来西亚奶茶店）\n\n请用以下示例初始化 seed data：\n- 店名：{business_name}（默认'茶道奶茶 Chadao Milk Tea'）\n- 奖励：免费珍珠奶茶 = 50积分，10%折扣券 = 100积分，免费小食拼盘 = 150积分，金牌专属限量杯 = 300积分\n- 会员：5位示例会员（不同等级、不同积分余额）\n- 交易：每位会员3-5笔历史消费\n- 活动：本周末双倍积分、新会员送{welcome_bonus}积分\n\n## 六、技术要求\n\n- 所有页面 Server Components 优先，仅交互部分用 Client Components\n- 手机号验证：马来西亚格式 +60 开头，10-11位数字\n- 积分变动必须用数据库事务（transaction）保证一致性\n- QR 码生成：用 `qrcode` 库生成店铺签到二维码\n- 支持 PWA（manifest.json + service worker）方便顾客添加到手机主屏\n- 所有界面默认中文，右上角可切换英文\n- 响应式设计：顾客端 mobile-first，管理端 desktop-first\n- 使用 Supabase Realtime 实现管理后台实时更新",
+    "prompt_body_en": "You are a senior full-stack engineer proficient in Next.js 16, Tailwind CSS 4, and Supabase. Build a complete Customer Loyalty & Rewards System for {business_name} (a Malaysian {business_type}) to replace traditional physical stamp cards.\n\nTech stack: Next.js 16 (App Router) + TypeScript + Tailwind CSS 4 + shadcn/ui + Supabase (Postgres + Auth + RLS + Realtime)\n\n## 1. Database Schema (Supabase Postgres)\n\n### Tables\n1. `members` — Customer profiles\n   - id (uuid, PK), phone (text, unique, +60 format), name (text), email (text, nullable)\n   - tier (enum: 'bronze','silver','gold'), total_spend (numeric), total_points_earned (int)\n   - current_points (int), birthday_month (int, 1-12), referral_code (text, unique)\n   - referred_by (uuid, FK → members.id, nullable), notes (text, nullable)\n   - joined_at (timestamptz), last_visit_at (timestamptz)\n\n2. `transactions` — Spend records\n   - id (uuid, PK), member_id (uuid, FK → members.id)\n   - amount_myr (numeric), points_earned (int), multiplier (numeric, default 1.0)\n   - source (enum: 'purchase','referral','birthday','campaign','manual','welcome')\n   - description (text, nullable), created_at (timestamptz), created_by (uuid, nullable)\n\n3. `rewards` — Rewards catalog\n   - id (uuid, PK), name_zh (text), name_en (text), description_zh (text), description_en (text)\n   - points_cost (int), category (text), image_url (text, nullable)\n   - min_tier (enum: 'bronze','silver','gold'), is_active (boolean), stock (int, nullable)\n   - valid_days (int, default 30), created_at (timestamptz)\n\n4. `redemptions` — Redemption records\n   - id (uuid, PK), member_id (uuid, FK), reward_id (uuid, FK)\n   - points_spent (int), status (enum: 'pending','fulfilled','expired','cancelled')\n   - voucher_code (text, unique), expires_at (timestamptz)\n   - fulfilled_at (timestamptz, nullable), created_at (timestamptz)\n\n5. `campaigns` — Marketing campaigns\n   - id (uuid, PK), name (text), type (enum: 'double_points','bonus_points','birthday','welcome')\n   - multiplier (numeric, nullable), bonus_points (int, nullable)\n   - start_date (date), end_date (date), is_active (boolean)\n   - conditions (jsonb), created_at (timestamptz)\n\n6. `events` — Behavior tracking\n   - id (uuid, PK), member_id (uuid, nullable), event_type (text)\n   - metadata (jsonb), created_at (timestamptz)\n\n### Indexes\n- members: phone, referral_code, tier, birthday_month\n- transactions: member_id, created_at, source\n- redemptions: member_id, status, voucher_code\n- campaigns: is_active, type, start_date, end_date\n\n### RLS Policies\n- Members can only view their own data (verified by phone)\n- Public read access to rewards (is_active = true)\n- Admin users (authenticated + admins allowlist) have full read/write access\n- events table: anon INSERT allowed, admin-only SELECT\n\n## 2. Points & Tier Business Logic\n\n### Points Calculation\n- Base rate: {points_per_rm} points earned per RM1 spent (rounded)\n- Welcome bonus: {welcome_bonus} points on registration\n- Referral bonus: 50 points each for referrer and referred member\n- Birthday month: All purchases earn 2x points during member's birthday month\n- Campaign multiplier: Stack with active campaign multipliers from campaigns table\n- Manual adjustment: Admin can add/deduct points with a mandatory reason\n\n### Tier System\n- Bronze: Default tier, total spend RM0+\n- Silver: Total spend reaches the silver threshold in {tier_thresholds}\n- Gold: Total spend reaches the gold threshold in {tier_thresholds}\n- Tier benefits: Silver earns 1.2x point multiplier, Gold earns 1.5x point multiplier\n- Tier evaluation: Auto-evaluated on the 1st of each month; downgrade requires 3 consecutive months below threshold\n\n### Reward Redemption Flow\n1. Member browses reward catalog (filtered by eligible tier)\n2. Selects reward → System checks current_points >= points_cost\n3. Deduct points → Generate unique voucher_code (6-char alphanumeric)\n4. Voucher validity = valid_days from redemption date\n5. Staff scans/enters voucher_code → Mark as fulfilled\n\n## 3. Customer-Facing Interface (Mobile-First PWA)\n\n### Page Structure\n1. **Home / Check-in** `/`\n   - Display {business_name} logo and brand color {primary_color}\n   - Two entry points: \"Scan QR to Check In\" and \"Enter Phone Number\"\n   - New user → Registration flow (name + phone in +60 format + birthday month)\n   - Returning user → Redirect to member dashboard\n\n2. **Member Dashboard** `/member`\n   - Top card: Name, tier badge (Bronze/Silver/Gold), current points (large font)\n   - Progress bar: \"RM XX more to reach [next tier]\"\n   - Quick actions: \"View Rewards\", \"Redemption History\", \"Refer a Friend\"\n   - Recent transactions list (last 5)\n\n3. **Rewards Catalog** `/rewards`\n   - Grid card layout, each card: reward name (ZH/EN), points cost, tier requirement\n   - Rewards beyond member's points shown greyed out but visible (motivation to spend)\n   - Tap → Reward detail → \"Redeem Now\" button\n\n4. **History** `/history`\n   - Tabs: \"Points History\" and \"Redemptions\"\n   - Points: date, source, points change (+/-), running balance\n   - Redemptions: reward name, voucher code, status, expiry date\n\n5. **Referral Page** `/referral`\n   - Display personal referral code and shareable link\n   - Share buttons (WhatsApp, copy link)\n   - Count of successful referrals and points earned\n\n### UI/UX Design Specs\n- Primary color: {primary_color}, paired with white background and dark gray text\n- Typography: Inter (English) + Noto Sans SC (Chinese), Chinese displayed by default\n- Points displayed in large bold numbers, tier badges as circular pills\n- All monetary values prefixed with RM, use thousands separator\n- Buttons: rounded-xl, cards with subtle shadow\n- Loading states: Skeleton components, success feedback via Sonner toast\n\n## 4. Admin Dashboard (Desktop-First)\n\n### Dashboard `/admin`\n- Four stat cards: Total Members, Active This Month, Points Issued Today, Points Redeemed Today\n- Trend chart: New member registrations over the past 30 days (daily)\n- Recent transactions list (real-time updates via Supabase Realtime)\n\n### Member Management `/admin/members`\n- Search bar: search by phone number or name\n- Table: name, phone, tier, points balance, total spend, last visit\n- Click row → Sheet sidebar: full profile, transaction history, manual point adjustment, add notes\n- Filters: by tier, registration date range\n\n### Rewards Management `/admin/rewards`\n- Rewards list + \"Add New Reward\" button\n- Edit form: ZH/EN names, points cost, minimum tier, stock count, validity days\n- Toggle: enable/disable\n\n### Campaign Management `/admin/campaigns`\n- Campaign list: name, type, date range, status\n- Create campaign: select type (double points / bonus points / birthday / welcome)\n- Set conditions: date range, multiplier or bonus amount\n\n### Redemption Verification `/admin/redeem`\n- Input field: enter or scan voucher code\n- Display: member name, reward details, expiry date\n- \"Confirm Redemption\" button\n\n### Analytics `/admin/analytics`\n- Retention rate: 1-month and 3-month revisit rates\n- Average visit frequency: weekly / monthly\n- Redemption rate: points issued vs points redeemed ratio\n- Loyalty member revenue vs non-member comparison (requires manual non-member input or estimation)\n- Tier distribution pie chart: Bronze / Silver / Gold member counts\n- Top redeemed rewards leaderboard\n\n## 5. Sample Seed Data (Malaysian Bubble Tea Shop)\n\nInitialize with the following sample data:\n- Shop name: {business_name} (default: \"Chadao Milk Tea 茶道奶茶\")\n- Rewards: Free Pearl Milk Tea = 50 pts, 10% Discount Voucher = 100 pts, Free Snack Platter = 150 pts, Gold-Exclusive Limited Edition Cup = 300 pts\n- Members: 5 sample members (different tiers and point balances)\n- Transactions: 3-5 historical purchases per member\n- Campaigns: This weekend double points, new member {welcome_bonus} pts welcome bonus\n\n## 6. Technical Requirements\n\n- Prefer Server Components for all pages; use Client Components only for interactive elements\n- Phone validation: Malaysian format starting with +60, 10-11 digits\n- Points mutations MUST use database transactions for consistency\n- QR code generation: Use `qrcode` library for store check-in QR codes\n- PWA support (manifest.json + service worker) so customers can add to home screen\n- Default language: Chinese, with English toggle in top-right corner\n- Responsive design: customer-facing is mobile-first, admin is desktop-first\n- Use Supabase Realtime for live admin dashboard updates",
+    "preview_prompt": "为 茶道奶茶 Chadao Milk Tea（一家马来西亚奶茶店）构建客户忠诚度积分系统。每消费 RM1 获得 1 积分，新会员送 20 积分。等级：Bronze（默认）、Silver（消费满 RM500）、Gold（消费满 RM2000）。奖励包括免费珍珠奶茶（50积分）和10%折扣券（100积分）。技术栈：Next.js 16 + Tailwind CSS 4 + Supabase。",
+    "tags": [
+      "full-app",
+      "loyalty",
+      "rewards",
+      "points-system",
+      "crm",
+      "pwa",
+      "qr-code",
+      "supabase-realtime"
+    ],
+    "industries": [
+      "fnb",
+      "retail",
+      "services",
+      "beauty",
+      "general"
+    ],
+    "variables": [
+      {
+        "key": "business_name",
+        "label_en": "Business Name",
+        "label_zh": "店铺名称",
+        "default_value": "茶道奶茶 Chadao Milk Tea",
+        "default_value_en": "茶道奶茶 Chadao Milk Tea",
+        "input_type": "text"
+      },
+      {
+        "key": "business_type",
+        "label_en": "Business Type",
+        "label_zh": "行业类型",
+        "default_value": "奶茶店 Bubble Tea Shop",
+        "default_value_en": "奶茶店 Bubble Tea Shop",
+        "input_type": "select"
+      },
+      {
+        "key": "points_per_rm",
+        "label_en": "Points per RM Spent",
+        "label_zh": "每RM积分数",
+        "default_value": "1",
+        "default_value_en": "1",
+        "input_type": "number"
+      },
+      {
+        "key": "welcome_bonus",
+        "label_en": "Welcome Bonus Points",
+        "label_zh": "新会员欢迎积分",
+        "default_value": "20",
+        "default_value_en": "20",
+        "input_type": "number"
+      },
+      {
+        "key": "tier_thresholds",
+        "label_en": "Tier Spend Thresholds",
+        "label_zh": "等级消费门槛",
+        "default_value": "Silver: RM500, Gold: RM2000",
+        "default_value_en": "Silver: RM500, Gold: RM2000",
+        "input_type": "text"
+      },
+      {
+        "key": "primary_color",
+        "label_en": "Primary Brand Color",
+        "label_zh": "品牌主色调",
+        "default_value": "#F59E0B",
+        "default_value_en": "#F59E0B",
+        "input_type": "text"
+      }
+    ],
+    "related": [
+      "qr-menu-ordering-system"
+    ]
+  }
+]

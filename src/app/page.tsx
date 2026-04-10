@@ -1,101 +1,109 @@
-import Image from "next/image";
+import { createClient } from "@/lib/supabase/server";
+import { Header } from "@/components/header";
+import { PromptCard } from "@/components/prompt-card";
+import Link from "next/link";
+import { Zap, ArrowRight, Folder } from "lucide-react";
+import type { PromptWithCategory, Category } from "@/types/database";
 
-export default function Home() {
+export default async function HomePage() {
+  const supabase = await createClient();
+
+  const [promptsRes, categoriesRes] = await Promise.all([
+    supabase
+      .from("prompts")
+      .select("*, category:categories(*)")
+      .eq("status", "published")
+      .order("times_copied", { ascending: false })
+      .limit(6),
+    supabase.from("categories").select("*").order("sort_order"),
+  ]);
+
+  const prompts = (promptsRes.data || []) as PromptWithCategory[];
+  const categories = (categoriesRes.data || []) as Category[];
+
+  // Count prompts per category
+  const { data: allPrompts } = await supabase
+    .from("prompts")
+    .select("category_id")
+    .eq("status", "published");
+
+  const categoryCounts: Record<string, number> = {};
+  (allPrompts || []).forEach((p) => {
+    categoryCounts[p.category_id] = (categoryCounts[p.category_id] || 0) + 1;
+  });
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <>
+      <Header />
+      <main>
+        {/* Hero */}
+        <section className="border-b bg-gradient-to-b from-yellow-50/50 to-white py-16 text-center">
+          <div className="mx-auto max-w-3xl px-4">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-primary/20 px-4 py-1.5 text-sm font-medium">
+              <Zap className="h-4 w-4" />
+              Student Exclusive · Continuously Updated
+            </div>
+            <h1 className="mb-4 text-4xl font-bold tracking-tight sm:text-5xl">
+              Vibe Coding
+              <br />
+              <span className="text-yellow-600">Prompt Library</span>
+            </h1>
+            <p className="mb-8 text-lg text-muted-foreground">
+              Ready-to-use AI Prompt templates — copy and paste into Cursor / Claude.
+              <br />
+              Built for SME owners, covering everything from quotations to data analysis.
+            </p>
+            <Link
+              href="/library"
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-3 font-semibold text-primary-foreground transition-colors hover:bg-yellow-400"
+            >
+              Browse Full Library
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        </section>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
+        {/* Categories */}
+        <section className="mx-auto max-w-7xl px-4 py-12">
+          <h2 className="mb-6 text-2xl font-bold">Categories</h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
+            {categories.map((cat) => (
+              <Link
+                key={cat.id}
+                href={`/library?category=${cat.slug}`}
+                className="flex flex-col items-center gap-2 rounded-xl border bg-white p-4 text-center transition-all hover:border-yellow-300 hover:shadow-sm"
+              >
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
+                  <Folder className="h-5 w-5" />
+                </div>
+                <span className="text-sm font-medium">{cat.name_en}</span>
+                <span className="text-xs text-muted-foreground">
+                  {categoryCounts[cat.id] || 0} templates
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        {/* Featured Prompts */}
+        <section className="mx-auto max-w-7xl px-4 pb-16">
+          <div className="mb-6 flex items-center justify-between">
+            <h2 className="text-2xl font-bold">Popular Templates</h2>
+            <Link
+              href="/library"
+              className="flex items-center gap-1 text-sm font-medium text-yellow-600 hover:text-yellow-700"
+            >
+              View All
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {prompts.map((prompt) => (
+              <PromptCard key={prompt.id} prompt={prompt} />
+            ))}
+          </div>
+        </section>
       </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+    </>
   );
 }
