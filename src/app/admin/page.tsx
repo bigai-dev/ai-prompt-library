@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import { Zap } from "lucide-react";
 
 export default function AdminLoginPage() {
@@ -70,13 +71,14 @@ export default function AdminLoginPage() {
             {error && (
               <p className="text-sm text-destructive">{error}</p>
             )}
-            <button
+            <Button
               type="submit"
               disabled={loading}
-              className="w-full rounded-lg bg-primary py-2.5 font-semibold text-primary-foreground transition-colors hover:bg-yellow-400 disabled:opacity-50"
+              size="lg"
+              className="w-full"
             >
               {loading ? "Logging in..." : "Log In"}
-            </button>
+            </Button>
           </form>
         </CardContent>
       </Card>

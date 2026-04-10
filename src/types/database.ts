@@ -1,4 +1,3 @@
-export type Difficulty = "easy" | "medium" | "hard";
 export type PromptStatus = "draft" | "published";
 export type EventType = "view" | "copy" | "favorite";
 export type InputType = "text" | "number" | "select" | "textarea";
@@ -20,7 +19,6 @@ export interface Prompt {
   title_en: string;
   subtitle: string;
   category_id: string;
-  difficulty: Difficulty;
   estimated_minutes: number;
   version: string;
   prompt_body: string;

@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { DifficultyBadge } from "@/components/difficulty-badge";
 import { FavoriteButton } from "@/components/favorite-button";
 import { toast } from "sonner";
 import { getAnonId } from "@/lib/anon-id";
@@ -151,7 +150,6 @@ export function PromptDetailClient({ prompt, variables, tags }: Props) {
 
         {/* Metadata row */}
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
-          <DifficultyBadge difficulty={prompt.difficulty} />
           <span className="flex items-center gap-1">
             <Clock className="h-3.5 w-3.5" />
             {prompt.estimated_minutes} min

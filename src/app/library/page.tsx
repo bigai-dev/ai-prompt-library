@@ -11,11 +11,11 @@ export const metadata = {
 export default async function LibraryPage({
   searchParams,
 }: {
-  searchParams: Promise<{ category?: string; difficulty?: string; q?: string; sort?: string; tag?: string; industry?: string }>;
+  searchParams: Promise<{ category?: string; q?: string; sort?: string; tag?: string; industry?: string }>;
 }) {
   const supabase = await createClient();
 
-  const { category, difficulty, q, sort = "popular", tag, industry } = await searchParams;
+  const { category, q, sort = "popular", tag, industry } = await searchParams;
 
   // Fetch categories, tags, and industries for filters
   const [categoriesRes, tagsRes, industriesRes] = await Promise.all([
@@ -53,7 +53,7 @@ export default async function LibraryPage({
                 categories={categories}
                 tags={tags}
                 industries={industries}
-                current={{ category, difficulty, q, sort, tag, industry }}
+                current={{ category, q, sort, tag, industry }}
               />
             </aside>
             <div className="flex-1">
@@ -84,10 +84,6 @@ export default async function LibraryPage({
     }
   }
 
-  if (difficulty) {
-    query = query.eq("difficulty", difficulty);
-  }
-
   if (q) {
     query = query.or(
       `title_zh.ilike.%${q}%,title_en.ilike.%${q}%,subtitle.ilike.%${q}%`
@@ -114,7 +110,7 @@ export default async function LibraryPage({
                     categories={categories}
                     tags={tags}
                     industries={industries}
-                    current={{ category, difficulty, q, sort, tag, industry }}
+                    current={{ category, q, sort, tag, industry }}
                   />
                 </aside>
                 <div className="flex-1">
@@ -156,7 +152,7 @@ export default async function LibraryPage({
               categories={categories}
               tags={tags}
               industries={industries}
-              current={{ category, difficulty, q, sort, tag, industry }}
+              current={{ category, q, sort, tag, industry }}
             />
           </aside>
 

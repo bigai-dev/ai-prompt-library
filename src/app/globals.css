@@ -93,9 +93,6 @@
   --var-input-border: 214 32% 86%;
   --var-input-focus: 217 91% 60%;
 
-  --badge-easy: 142 71% 45%;
-  --badge-medium: 45 93% 47%;
-  --badge-hard: 0 84% 60%;
 }
 
 @layer base {

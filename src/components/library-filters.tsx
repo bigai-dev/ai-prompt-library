@@ -10,7 +10,6 @@ interface FiltersProps {
   industries: Industry[];
   current: {
     category?: string;
-    difficulty?: string;
     q?: string;
     sort?: string;
     tag?: string;
@@ -105,38 +104,6 @@ export function LibraryFilters({ categories, tags, industries, current }: Filter
               )}
             >
               {cat.name_en}
-            </Link>
-          ))}
-        </div>
-      </div>
-
-      {/* Difficulty */}
-      <div>
-        <h3 className="mb-2 text-sm font-semibold text-muted-foreground">Difficulty</h3>
-        <div className="flex flex-col gap-1">
-          <Link
-            href={buildUrl({ difficulty: undefined })}
-            className={cn(
-              "rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-secondary",
-              !current.difficulty && "bg-secondary font-medium"
-            )}
-          >
-            All
-          </Link>
-          {[
-            { value: "easy", label: "Easy" },
-            { value: "medium", label: "Medium" },
-            { value: "hard", label: "Hard" },
-          ].map(({ value, label }) => (
-            <Link
-              key={value}
-              href={buildUrl({ difficulty: value })}
-              className={cn(
-                "rounded-md px-3 py-1.5 text-sm transition-colors hover:bg-secondary",
-                current.difficulty === value && "bg-secondary font-medium"
-              )}
-            >
-              {label}
             </Link>
           ))}
         </div>

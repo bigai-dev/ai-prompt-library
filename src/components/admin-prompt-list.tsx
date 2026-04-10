@@ -18,8 +18,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { DifficultyBadge } from "@/components/difficulty-badge";
-import { MoreHorizontal, Plus, Eye, Edit, Trash2, ToggleLeft } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { MoreHorizontal, Plus, Eye, Edit, Trash2, ToggleLeft, Search } from "lucide-react";
+import { toast } from "sonner";
 import type { PromptWithCategory, Category } from "@/types/database";
 
 interface Props {
@@ -31,44 +33,46 @@ export function AdminPromptList({ prompts }: Props) {
   const router = useRouter();
   const [filter, setFilter] = useState("");
 
+  const query = filter.toLowerCase();
   const filtered = prompts.filter(
     (p) =>
-      p.title_en.includes(filter) ||
-      p.title_en.toLowerCase().includes(filter.toLowerCase()) ||
-      p.slug.includes(filter)
+      p.title_en.toLowerCase().includes(query) ||
+      p.title_zh?.toLowerCase().includes(query) ||
+      p.slug.includes(query)
   );
 
-  const handlePublish = async (id: string) => {
+  const handlePublish = async (id: string, currentStatus: string) => {
+    const action = currentStatus === "published" ? "unpublished" : "published";
     await fetch(`/api/v1/admin/prompts/${id}/publish`, { method: "POST" });
+    toast.success(`Prompt ${action}`);
     router.refresh();
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this prompt?")) return;
     await fetch(`/api/v1/admin/prompts/${id}`, { method: "DELETE" });
+    toast.success("Prompt deleted");
     router.refresh();
   };
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold">Prompt Management</h1>
-        <Link
-          href="/admin/prompts/new"
-          className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 font-semibold text-primary-foreground hover:bg-yellow-400"
-        >
+        <Link href="/admin/prompts/new" className={buttonVariants()}>
           <Plus className="h-4 w-4" />
           New Prompt
         </Link>
       </div>
 
-      <div className="mb-4">
-        <input
+      <div className="relative mb-4 max-w-xs">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
           type="text"
           placeholder="Search prompts..."
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="w-full max-w-xs rounded-lg border bg-white px-3 py-2 text-sm"
+          className="pl-9"
         />
       </div>
 
@@ -77,78 +81,83 @@ export function AdminPromptList({ prompts }: Props) {
           <TableHeader>
             <TableRow>
               <TableHead>Title</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Difficulty</TableHead>
+              <TableHead className="hidden sm:table-cell">Category</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="text-right">Copies</TableHead>
+              <TableHead className="hidden sm:table-cell text-right">Copies</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filtered.map((prompt) => (
-              <TableRow key={prompt.id}>
-                <TableCell>
-                  <div>
-                    <div className="font-medium">{prompt.title_en}</div>
-                    <div className="text-xs text-muted-foreground">
-                      /{prompt.slug}
-                    </div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge variant="secondary">
-                    {prompt.category?.name_en}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <DifficultyBadge difficulty={prompt.difficulty} />
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    variant={
-                      prompt.status === "published" ? "default" : "secondary"
-                    }
-                  >
-                    {prompt.status === "published" ? "Published" : "Draft"}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  {prompt.times_copied}
-                </TableCell>
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger className="rounded p-1 hover:bg-secondary">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem
-                        onClick={() => window.open(`/prompt/${prompt.slug}`, "_blank")}
-                      >
-                        <Eye className="mr-2 h-4 w-4" />
-                        Preview
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => router.push(`/admin/prompts/${prompt.id}/edit`)}
-                      >
-                        <Edit className="mr-2 h-4 w-4" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handlePublish(prompt.id)}>
-                        <ToggleLeft className="mr-2 h-4 w-4" />
-                        {prompt.status === "published" ? "Unpublish" : "Publish"}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleDelete(prompt.id)}
-                        className="text-destructive"
-                      >
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+            {filtered.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                  {filter ? "No prompts match your search" : "No prompts yet"}
                 </TableCell>
               </TableRow>
-            ))}
+            ) : (
+              filtered.map((prompt) => (
+                <TableRow key={prompt.id}>
+                  <TableCell>
+                    <div>
+                      <div className="font-medium">{prompt.title_en}</div>
+                      <div className="text-xs text-muted-foreground">
+                        /{prompt.slug}
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell">
+                    <Badge variant="secondary">
+                      {prompt.category?.name_en}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={
+                        prompt.status === "published" ? "default" : "secondary"
+                      }
+                    >
+                      {prompt.status === "published" ? "Published" : "Draft"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="hidden sm:table-cell text-right">
+                    {prompt.times_copied}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger className={buttonVariants({ variant: "ghost", size: "icon-sm" })}>
+                        <MoreHorizontal className="h-4 w-4" />
+                        <span className="sr-only">Actions</span>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => window.open(`/prompt/${prompt.slug}`, "_blank")}
+                        >
+                          <Eye className="mr-2 h-4 w-4" />
+                          Preview
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => router.push(`/admin/prompts/${prompt.id}/edit`)}
+                        >
+                          <Edit className="mr-2 h-4 w-4" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handlePublish(prompt.id, prompt.status)}>
+                          <ToggleLeft className="mr-2 h-4 w-4" />
+                          {prompt.status === "published" ? "Unpublish" : "Publish"}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleDelete(prompt.id)}
+                          className="text-destructive"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>

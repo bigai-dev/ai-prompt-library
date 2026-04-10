@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Clock, Star, Copy } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { DifficultyBadge } from "@/components/difficulty-badge";
 import { FavoriteButton } from "@/components/favorite-button";
 import type { PromptWithCategory } from "@/types/database";
 
@@ -21,7 +20,6 @@ export function PromptCard({
               <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-secondary-foreground">
                 {prompt.category?.name_en}
               </span>
-              <DifficultyBadge difficulty={prompt.difficulty} />
             </div>
             <h3 className="text-sm font-medium leading-snug group-hover:text-yellow-600 transition-colors">
               {prompt.title_en}
@@ -43,7 +41,6 @@ export function PromptCard({
             <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium text-secondary-foreground">
               {prompt.category?.name_en}
             </span>
-            <DifficultyBadge difficulty={prompt.difficulty} />
           </div>
 
           <h3 className="mb-1 font-semibold leading-snug group-hover:text-yellow-600 transition-colors">

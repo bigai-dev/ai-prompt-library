@@ -2,9 +2,25 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
-import { FileText, FolderOpen, BarChart3, LogOut, Zap, Home } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import {
+  FileText,
+  FolderOpen,
+  BarChart3,
+  LogOut,
+  Zap,
+  Home,
+  Menu,
+} from "lucide-react";
 
 const navItems = [
   { href: "/admin/prompts", label: "Prompts", icon: FileText },
@@ -12,7 +28,7 @@ const navItems = [
   { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
 ];
 
-export function AdminSidebar() {
+function NavContent({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -24,17 +40,11 @@ export function AdminSidebar() {
   };
 
   return (
-    <aside className="flex w-56 flex-col border-r bg-white">
-      <div className="flex h-16 items-center gap-2 border-b px-4">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-          <Zap className="h-5 w-5 text-primary-foreground" />
-        </div>
-        <span className="font-semibold">Admin</span>
-      </div>
-
+    <>
       <nav className="flex-1 space-y-1 p-3">
         <Link
           href="/"
+          onClick={onNavigate}
           className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-secondary"
         >
           <Home className="h-4 w-4" />
@@ -45,6 +55,7 @@ export function AdminSidebar() {
           <Link
             key={href}
             href={href}
+            onClick={onNavigate}
             className={cn(
               "flex items-center gap-2 rounded-md px-3 py-2 text-sm transition-colors hover:bg-secondary",
               pathname.startsWith(href) && "bg-secondary font-medium"
@@ -65,6 +76,60 @@ export function AdminSidebar() {
           Log Out
         </button>
       </div>
-    </aside>
+    </>
+  );
+}
+
+export function AdminSidebar() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      {/* Mobile top bar */}
+      <div className="fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-3 border-b bg-white px-4 md:hidden">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setOpen(true)}
+        >
+          <Menu className="h-5 w-5" />
+          <span className="sr-only">Open menu</span>
+        </Button>
+        <div className="flex items-center gap-2">
+          <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary">
+            <Zap className="h-4 w-4 text-primary-foreground" />
+          </div>
+          <span className="font-semibold text-sm">Admin</span>
+        </div>
+      </div>
+
+      {/* Mobile sheet */}
+      <Sheet open={open} onOpenChange={setOpen}>
+        <SheetContent side="left" className="w-56 p-0">
+          <SheetHeader className="border-b px-4 py-3">
+            <SheetTitle className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary">
+                <Zap className="h-4 w-4 text-primary-foreground" />
+              </div>
+              Admin
+            </SheetTitle>
+          </SheetHeader>
+          <div className="flex flex-1 flex-col">
+            <NavContent onNavigate={() => setOpen(false)} />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Desktop sidebar */}
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-56 flex-col border-r bg-white md:flex">
+        <div className="flex h-14 items-center gap-2 border-b px-4">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+            <Zap className="h-5 w-5 text-primary-foreground" />
+          </div>
+          <span className="font-semibold">Admin</span>
+        </div>
+        <NavContent />
+      </aside>
+    </>
   );
 }

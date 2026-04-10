@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { AdminSidebar } from "@/components/admin-sidebar";
 import { CategoriesManager } from "@/components/categories-manager";
 import type { Category } from "@/types/database";
 
@@ -13,12 +12,5 @@ export default async function AdminCategoriesPage() {
     .select("*")
     .order("sort_order");
 
-  return (
-    <>
-      <AdminSidebar />
-      <main className="flex-1 overflow-auto bg-secondary/20 p-6">
-        <CategoriesManager categories={(data || []) as Category[]} />
-      </main>
-    </>
-  );
+  return <CategoriesManager categories={(data || []) as Category[]} />;
 }

@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { AdminSidebar } from "@/components/admin-sidebar";
 import { AdminPromptList } from "@/components/admin-prompt-list";
 import type { PromptWithCategory, Category } from "@/types/database";
 
@@ -17,14 +16,9 @@ export default async function AdminPromptsPage() {
   ]);
 
   return (
-    <>
-      <AdminSidebar />
-      <main className="flex-1 overflow-auto bg-secondary/20 p-6">
-        <AdminPromptList
-          prompts={(promptsRes.data || []) as PromptWithCategory[]}
-          categories={(categoriesRes.data || []) as Category[]}
-        />
-      </main>
-    </>
+    <AdminPromptList
+      prompts={(promptsRes.data || []) as PromptWithCategory[]}
+      categories={(categoriesRes.data || []) as Category[]}
+    />
   );
 }

@@ -1,5 +1,4 @@
 import { createClient } from "@/lib/supabase/server";
-import { AdminSidebar } from "@/components/admin-sidebar";
 import { PromptEditor } from "@/components/prompt-editor";
 import { notFound } from "next/navigation";
 import type { Category, Tag, Prompt, PromptVariable } from "@/types/database";
@@ -30,17 +29,12 @@ export default async function EditPromptPage({
   if (!promptRes.data) notFound();
 
   return (
-    <>
-      <AdminSidebar />
-      <main className="flex-1 overflow-auto bg-secondary/20 p-6">
-        <PromptEditor
-          prompt={promptRes.data as Prompt}
-          categories={(categoriesRes.data || []) as Category[]}
-          tags={(tagsRes.data || []) as Tag[]}
-          existingVariables={(variablesRes.data || []) as PromptVariable[]}
-          existingTagIds={(promptTagsRes.data || []).map((t) => t.tag_id)}
-        />
-      </main>
-    </>
+    <PromptEditor
+      prompt={promptRes.data as Prompt}
+      categories={(categoriesRes.data || []) as Category[]}
+      tags={(tagsRes.data || []) as Tag[]}
+      existingVariables={(variablesRes.data || []) as PromptVariable[]}
+      existingTagIds={(promptTagsRes.data || []).map((t) => t.tag_id)}
+    />
   );
 }

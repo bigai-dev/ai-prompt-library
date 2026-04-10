@@ -6,7 +6,6 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
 
   const category = searchParams.get("category");
-  const difficulty = searchParams.get("difficulty");
   const q = searchParams.get("q");
   const tag = searchParams.get("tag");
   const sort = searchParams.get("sort") || "popular";
@@ -20,9 +19,6 @@ export async function GET(request: NextRequest) {
 
   if (category) {
     query = query.eq("category.slug", category);
-  }
-  if (difficulty) {
-    query = query.eq("difficulty", difficulty);
   }
   if (q) {
     query = query.or(
