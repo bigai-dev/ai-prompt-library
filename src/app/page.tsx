@@ -1,99 +1,191 @@
 import { createClient } from "@/lib/supabase/server";
 import { Header } from "@/components/header";
 import { PromptCard } from "@/components/prompt-card";
+import { CourseCard } from "@/components/course-card";
+import { ContinueLearning } from "@/components/continue-learning";
+import { MOCK_COURSES, getTotalLessons, getTotalDuration } from "@/lib/mock-courses";
 import Link from "next/link";
-import { Zap, ArrowRight, Folder } from "lucide-react";
-import type { PromptWithCategory, Category } from "@/types/database";
+import {
+  Zap,
+  ArrowRight,
+  BookOpen,
+  FileText,
+  Play,
+  Clock,
+  Users,
+} from "lucide-react";
+import type { PromptWithCategory } from "@/types/database";
 
 export default async function HomePage() {
   const supabase = await createClient();
 
-  const [promptsRes, categoriesRes] = await Promise.all([
+  const [promptsRes, promptCountRes] = await Promise.all([
     supabase
       .from("prompts")
       .select("*, category:categories(*)")
       .eq("status", "published")
       .order("times_copied", { ascending: false })
       .limit(6),
-    supabase.from("categories").select("*").order("sort_order"),
+    supabase
+      .from("prompts")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "published"),
   ]);
 
   const prompts = (promptsRes.data || []) as PromptWithCategory[];
-  const categories = (categoriesRes.data || []) as Category[];
+  const promptCount = promptCountRes.count ?? 0;
 
-  // Count prompts per category
-  const { data: allPrompts } = await supabase
-    .from("prompts")
-    .select("category_id")
-    .eq("status", "published");
-
-  const categoryCounts: Record<string, number> = {};
-  (allPrompts || []).forEach((p) => {
-    categoryCounts[p.category_id] = (categoryCounts[p.category_id] || 0) + 1;
-  });
+  // Aggregate course stats
+  const totalCourses = MOCK_COURSES.length;
+  const totalLessons = MOCK_COURSES.reduce((s, c) => s + getTotalLessons(c), 0);
+  const totalMinutes = MOCK_COURSES.reduce((s, c) => s + getTotalDuration(c), 0);
 
   return (
     <>
       <Header />
       <main>
-        {/* Hero */}
-        <section className="border-b bg-gradient-to-b from-yellow-50/50 to-white py-16 text-center">
-          <div className="mx-auto max-w-3xl px-4">
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-primary/20 px-4 py-1.5 text-sm font-medium">
-              <Zap className="h-4 w-4" />
-              Student Exclusive · Continuously Updated
+        {/* Hero — Dual product hub */}
+        <section className="border-b bg-gradient-to-b from-slate-50 to-white">
+          <div className="mx-auto max-w-5xl px-4 py-14 sm:py-20">
+            <div className="text-center">
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-yellow-200 bg-yellow-50 px-4 py-1.5 text-sm font-medium text-yellow-800">
+                <Zap className="h-3.5 w-3.5" />
+                Workshop Students Only
+              </div>
+              <h1 className="mb-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl">
+                Vibe Coding
+                <span className="block text-yellow-600">Learning Hub</span>
+              </h1>
+              <p className="mx-auto mb-10 max-w-xl text-base text-slate-600 sm:text-lg">
+                Video courses and prompt templates to master AI-assisted coding.
+                <br className="hidden sm:block" />
+                Built for SME owners — no coding experience needed.
+              </p>
             </div>
-            <h1 className="mb-4 text-4xl font-bold tracking-tight sm:text-5xl">
-              Vibe Coding
-              <br />
-              <span className="text-yellow-600">Prompt Library</span>
-            </h1>
-            <p className="mb-8 text-lg text-muted-foreground">
-              Ready-to-use AI Prompt templates — copy and paste into Cursor / Claude.
-              <br />
-              Built for SME owners, covering everything from quotations to data analysis.
-            </p>
-            <Link
-              href="/library"
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-3 font-semibold text-primary-foreground transition-colors hover:bg-yellow-400"
-            >
-              Browse Full Library
-              <ArrowRight className="h-4 w-4" />
-            </Link>
+
+            {/* Dual CTA cards */}
+            <div className="mx-auto grid max-w-2xl gap-4 sm:grid-cols-2">
+              <Link
+                href="/courses"
+                className="group relative overflow-hidden rounded-2xl border-2 border-slate-200 bg-white p-6 transition-all hover:border-yellow-300 hover:shadow-lg"
+              >
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-900 text-white">
+                  <Play className="h-6 w-6" />
+                </div>
+                <h2 className="mb-1 text-xl font-bold text-slate-900">
+                  Video Courses
+                </h2>
+                <p className="mb-1 text-sm font-medium text-slate-600">
+                  视频课程
+                </p>
+                <p className="mb-4 text-sm text-slate-500">
+                  Watch step-by-step Loom videos and track your progress through
+                  each course.
+                </p>
+                <div className="flex items-center gap-3 text-xs text-slate-500">
+                  <span className="flex items-center gap-1">
+                    <BookOpen className="h-3 w-3" />
+                    {totalCourses} courses
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <FileText className="h-3 w-3" />
+                    {totalLessons} lessons
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {totalMinutes} min
+                  </span>
+                </div>
+                <div className="absolute bottom-6 right-6 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition-all group-hover:bg-yellow-400 group-hover:text-white">
+                  <ArrowRight className="h-4 w-4" />
+                </div>
+              </Link>
+
+              <Link
+                href="/library"
+                className="group relative overflow-hidden rounded-2xl border-2 border-slate-200 bg-white p-6 transition-all hover:border-yellow-300 hover:shadow-lg"
+              >
+                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-yellow-400 text-white">
+                  <FileText className="h-6 w-6" />
+                </div>
+                <h2 className="mb-1 text-xl font-bold text-slate-900">
+                  Prompt Templates
+                </h2>
+                <p className="mb-1 text-sm font-medium text-slate-600">
+                  提示词模板
+                </p>
+                <p className="mb-4 text-sm text-slate-500">
+                  Copy-paste AI prompts for quotations, emails, data analysis,
+                  and more.
+                </p>
+                <div className="flex items-center gap-3 text-xs text-slate-500">
+                  <span className="flex items-center gap-1">
+                    <FileText className="h-3 w-3" />
+                    {promptCount}+ templates
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Users className="h-3 w-3" />
+                    8 categories
+                  </span>
+                </div>
+                <div className="absolute bottom-6 right-6 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition-all group-hover:bg-yellow-400 group-hover:text-white">
+                  <ArrowRight className="h-4 w-4" />
+                </div>
+              </Link>
+            </div>
           </div>
         </section>
 
-        {/* Categories */}
-        <section className="mx-auto max-w-7xl px-4 py-12">
-          <h2 className="mb-6 text-2xl font-bold">Categories</h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-8">
-            {categories.map((cat) => (
-              <Link
-                key={cat.id}
-                href={`/library?category=${cat.slug}`}
-                className="flex flex-col items-center gap-2 rounded-xl border bg-white p-4 text-center transition-all hover:border-yellow-300 hover:shadow-sm"
-              >
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
-                  <Folder className="h-5 w-5" />
-                </div>
-                <span className="text-sm font-medium">{cat.name_en}</span>
-                <span className="text-xs text-muted-foreground">
-                  {categoryCounts[cat.id] || 0} templates
-                </span>
-              </Link>
+        {/* Continue Learning — only shows if user has in-progress courses */}
+        <ContinueLearning />
+
+        {/* Courses section */}
+        <section className="mx-auto max-w-7xl px-4 py-10">
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">
+                Video Courses
+              </h2>
+              <p className="text-sm text-slate-500">
+                Step-by-step video lessons at your own pace
+              </p>
+            </div>
+            <Link
+              href="/courses"
+              className="flex items-center gap-1 text-sm font-medium text-yellow-600 hover:text-yellow-700"
+            >
+              View All
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {MOCK_COURSES.slice(0, 3).map((course, i) => (
+              <CourseCard key={course.slug} course={course} index={i} />
             ))}
           </div>
         </section>
 
-        {/* Featured Prompts */}
-        <section className="mx-auto max-w-7xl px-4 pb-16">
+        {/* Divider */}
+        <div className="mx-auto max-w-7xl px-4">
+          <hr className="border-slate-100" />
+        </div>
+
+        {/* Prompts section — different visual treatment */}
+        <section className="mx-auto max-w-7xl px-4 py-10 pb-16">
           <div className="mb-6 flex items-center justify-between">
-            <h2 className="text-2xl font-bold">Popular Templates</h2>
+            <div>
+              <h2 className="text-xl font-bold text-slate-900">
+                Popular Prompts
+              </h2>
+              <p className="text-sm text-slate-500">
+                Ready-to-use templates for Cursor, Claude, and v0
+              </p>
+            </div>
             <Link
               href="/library"
               className="flex items-center gap-1 text-sm font-medium text-yellow-600 hover:text-yellow-700"
             >
-              View All
+              Browse All
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -104,6 +196,76 @@ export default async function HomePage() {
           </div>
         </section>
       </main>
+
+      {/* Footer */}
+      <footer className="border-t bg-slate-900 text-slate-400">
+        <div className="mx-auto max-w-7xl px-4 py-12">
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+            {/* Brand */}
+            <div className="sm:col-span-2 lg:col-span-1">
+              <div className="mb-3 flex items-center gap-2">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-yellow-400">
+                  <Zap className="h-5 w-5 text-slate-900" />
+                </div>
+                <span className="font-bold text-white">Vibe Coding</span>
+              </div>
+              <p className="text-sm leading-relaxed">
+                AI-assisted coding for SME owners.
+                <br />
+                No coding experience needed.
+              </p>
+            </div>
+
+            {/* Learn */}
+            <div>
+              <h4 className="mb-3 text-sm font-semibold text-white">Learn</h4>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <Link href="/courses" className="transition-colors hover:text-white">
+                    Video Courses
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/library" className="transition-colors hover:text-white">
+                    Prompt Library
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/favorites" className="transition-colors hover:text-white">
+                    My Favorites
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Tools */}
+            <div>
+              <h4 className="mb-3 text-sm font-semibold text-white">Tools We Use</h4>
+              <ul className="space-y-2 text-sm">
+                <li>Cursor</li>
+                <li>Claude</li>
+                <li>v0</li>
+              </ul>
+            </div>
+
+            {/* Contact */}
+            <div>
+              <h4 className="mb-3 text-sm font-semibold text-white">Support</h4>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <Link href="/admin" className="transition-colors hover:text-white">
+                    Admin Portal
+                  </Link>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="mt-10 border-t border-slate-800 pt-6 text-center text-xs text-slate-500">
+            © {new Date().getFullYear()} Vibe Coding Learning Hub. All rights reserved.
+          </div>
+        </div>
+      </footer>
     </>
   );
 }

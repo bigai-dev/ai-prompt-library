@@ -15,17 +15,21 @@ import {
 import {
   FileText,
   FolderOpen,
-  BarChart3,
+  LayoutDashboard,
   LogOut,
   Zap,
-  Home,
+  ExternalLink,
   Menu,
+  Video,
+  Users,
 } from "lucide-react";
 
 const navItems = [
+  { href: "/admin/analytics", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/prompts", label: "Prompts", icon: FileText },
-  { href: "/admin/categories", label: "Categories", icon: FolderOpen },
-  { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/admin/categories", label: "Prompt Categories", icon: FolderOpen },
+  { href: "/admin/courses", label: "Courses", icon: Video },
 ];
 
 function NavContent({ onNavigate }: { onNavigate?: () => void }) {
@@ -45,12 +49,12 @@ function NavContent({ onNavigate }: { onNavigate?: () => void }) {
         <Link
           href="/"
           onClick={onNavigate}
-          className="flex items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-secondary"
+          className="flex items-center justify-center gap-2 rounded-lg bg-slate-100 px-3 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-yellow-100 hover:text-slate-900"
         >
-          <Home className="h-4 w-4" />
+          <ExternalLink className="h-4 w-4" />
           Back to Site
         </Link>
-        <div className="my-2 border-t" />
+        <div className="my-3 border-t" />
         {navItems.map(({ href, label, icon: Icon }) => (
           <Link
             key={href}

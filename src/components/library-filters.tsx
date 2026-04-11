@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Category, Tag, Industry } from "@/types/database";
 
@@ -18,6 +20,9 @@ interface FiltersProps {
 }
 
 export function LibraryFilters({ categories, tags, industries, current }: FiltersProps) {
+  const pathname = usePathname();
+  const isFavorites = pathname === "/favorites";
+
   function buildUrl(params: Record<string, string | undefined>) {
     const merged = { ...current, ...params };
     const sp = new URLSearchParams();
@@ -29,6 +34,22 @@ export function LibraryFilters({ categories, tags, industries, current }: Filter
 
   return (
     <div className="space-y-6">
+      {/* Favorites */}
+      <Link
+        href="/favorites"
+        className={cn(
+          "flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold shadow-sm transition-all",
+          isFavorites
+            ? "bg-yellow-400 text-slate-900 shadow-yellow-200"
+            : "bg-slate-900 text-white hover:bg-slate-800 hover:shadow-md"
+        )}
+      >
+        <Heart className={cn("h-5 w-5", isFavorites ? "fill-slate-900 text-slate-900" : "fill-yellow-400 text-yellow-400")} />
+        My Favorites
+      </Link>
+
+      <div className="border-t" />
+
       {/* Sort */}
       <div>
         <h3 className="mb-2 text-sm font-semibold text-muted-foreground">Sort</h3>

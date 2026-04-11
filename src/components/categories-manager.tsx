@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Plus, Save } from "lucide-react";
+import { IconPicker } from "@/components/icon-picker";
 import type { Category } from "@/types/database";
 
 export function CategoriesManager({ categories }: { categories: Category[] }) {
@@ -127,12 +128,9 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
                   {cat.slug}
                 </TableCell>
                 <TableCell>
-                  <Input
-                    defaultValue={cat.icon}
-                    className="h-8 text-sm"
-                    onBlur={(e) =>
-                      handleUpdate(cat.id, "icon", e.target.value)
-                    }
+                  <IconPicker
+                    value={cat.icon}
+                    onChange={(icon) => handleUpdate(cat.id, "icon", icon)}
                   />
                 </TableCell>
               </TableRow>
@@ -183,13 +181,12 @@ export function CategoriesManager({ categories }: { categories: Category[] }) {
                 />
               </div>
               <div>
-                <Label className="text-xs">Icon (Lucide name)</Label>
-                <Input
+                <Label className="text-xs">Icon</Label>
+                <IconPicker
                   value={newCat.icon}
-                  onChange={(e) =>
-                    setNewCat((n) => ({ ...n, icon: e.target.value }))
+                  onChange={(icon) =>
+                    setNewCat((n) => ({ ...n, icon }))
                   }
-                  placeholder="e.g. shopping-cart"
                 />
               </div>
             </div>

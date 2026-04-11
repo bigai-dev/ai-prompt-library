@@ -6,8 +6,8 @@
 
 -- Admin allowlist
 insert into admins (email) values
-  ('jay@bigai.my'),
-  ('reeve@bigai.my');
+  ('jay@big-ai.co'),
+  ('reeve@big-ai.co');
 
 -- Categories
 insert into categories (slug, name_zh, name_en, icon, sort_order) values
@@ -488,7 +488,7 @@ insert into prompt_variables (prompt_id, key, label_zh, label_en, default_value,
   ((select id from prompts where slug = 'landing-page-generator'), 'key_benefits',     '核心卖点',   'Key Benefits',       '1. 无需编程经验\n2. 实战项目驱动\n3. 小班教学（限20人）', 'textarea', 3),
   ((select id from prompts where slug = 'landing-page-generator'), 'target_audience',  '目标受众',   'Target Audience',    '马来西亚中小企业老板',         'text', 4),
   ((select id from prompts where slug = 'landing-page-generator'), 'cta_text',         'CTA 按钮',   'CTA Text',           '立即报名',                    'text', 5),
-  ((select id from prompts where slug = 'landing-page-generator'), 'cta_link',         'CTA 链接',   'CTA Link',           'https://bigai.my/register',   'text', 6),
+  ((select id from prompts where slug = 'landing-page-generator'), 'cta_link',         'CTA 链接',   'CTA Link',           'https://big-ai.co/register',   'text', 6),
   ((select id from prompts where slug = 'landing-page-generator'), 'pricing',          '价格',       'Pricing',            '早鸟价 RM 997（原价 RM 1,997）', 'text', 7),
   ((select id from prompts where slug = 'landing-page-generator'), 'contact_info',     '联系方式',   'Contact Info',       'WhatsApp: +60 12-345 6789',   'text', 8),
   ((select id from prompts where slug = 'landing-page-generator'), 'color_scheme',     '配色方案',   'Color Scheme',       '黄色为主色调，深色背景',       'text', 9);

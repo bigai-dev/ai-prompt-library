@@ -2,25 +2,45 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Zap, Heart, Search } from "lucide-react";
+import { Zap, Video, LogOut, User } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 export function Header() {
   const pathname = usePathname();
   const router = useRouter();
-  const [search, setSearch] = useState("");
+  const [user, setUser] = useState<SupabaseUser | null>(null);
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (search.trim()) {
-      router.push(`/library?q=${encodeURIComponent(search.trim())}`);
-    }
+  useEffect(() => {
+    const supabase = createClient();
+
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    router.push("/");
+    router.refresh();
   };
 
   if (pathname.startsWith("/admin")) return null;
+
+  const displayName = user?.user_metadata?.full_name || user?.email;
 
   return (
     <header className="sticky top-0 z-50 border-b bg-white/80 backdrop-blur-sm">
@@ -29,7 +49,7 @@ export function Header() {
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
             <Zap className="h-5 w-5 text-primary-foreground" />
           </div>
-          <span className="hidden sm:inline">Prompt Library</span>
+          <span className="hidden sm:inline">Vibe Coding</span>
         </Link>
 
         <nav className="flex items-center gap-1">
@@ -43,28 +63,44 @@ export function Header() {
             Library
           </Link>
           <Link
-            href="/favorites"
+            href="/courses"
             className={cn(
               "flex items-center gap-1 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-secondary",
-              pathname === "/favorites" && "bg-secondary"
+              pathname.startsWith("/courses") && "bg-secondary"
             )}
           >
-            <Heart className="h-4 w-4" />
-            <span className="hidden sm:inline">Favorites</span>
+            <Video className="h-4 w-4" />
+            <span className="hidden sm:inline">Courses</span>
           </Link>
         </nav>
 
-        <form onSubmit={handleSearch} className="ml-auto flex max-w-xs flex-1">
-          <div className="relative w-full">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search templates..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9"
-            />
-          </div>
-        </form>
+        {/* Right side: auth */}
+        <div className="ml-auto flex items-center gap-1">
+          {user ? (
+            <div className="flex items-center gap-1 border-l pl-3 ml-2">
+              <span className="hidden items-center gap-1.5 text-sm text-muted-foreground sm:flex">
+                <User className="h-3.5 w-3.5" />
+                {displayName}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleLogout}
+                className="gap-1.5 text-muted-foreground"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Log Out</span>
+              </Button>
+            </div>
+          ) : (
+            <Link
+              href="/login"
+              className="ml-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-secondary"
+            >
+              Log In
+            </Link>
+          )}
+        </div>
       </div>
     </header>
   );

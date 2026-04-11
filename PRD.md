@@ -1,6 +1,6 @@
 # PRD: AI Prompt Library for Workshop Students
 
-**Owner:** Jay (Big AI Sdn Bhd)
+**Owner:** Jay
 **Audience:** Vibe Coding workshop students (Malaysian Chinese SME owners)
 **Built with:** Claude Code
 **Last updated:** 2026-04-08
@@ -11,7 +11,7 @@
 
 Build a web-based AI Prompt Library that workshop students can browse to copy proven, ready-to-use prompts for building real software with Vibe Coding (Cursor / v0 / Claude). Each prompt is a "template" with a clear use case, fillable variables, difficulty rating, and time estimate. Jay manages all content from an admin portal; students consume via a public catalog.
 
-The product is an ongoing asset across multiple cohorts, not a one-off handout. It must be cheap to host, easy to update, and feel premium enough that students perceive Big AI as the authoritative Vibe Coding source in Southeast Asia.
+The product is an ongoing asset across multiple cohorts, not a one-off handout. It must be cheap to host, easy to update, and feel premium enough that students perceive it as the authoritative Vibe Coding source in Southeast Asia.
 
 ### Success metrics (first 90 days)
 1. 100+ prompts published across 8+ categories
@@ -175,7 +175,7 @@ Search uses Postgres full text search on `title_zh`, `title_en`, `subtitle`, `pr
 ## 7. Public UI Specifications
 
 ### 7.1 Landing page (`/`)
-- Hero: "Big AI Vibe Coding · Prompt Library · 学员专属 · 持续更新"
+- Hero: "Vibe Coding · Learning Hub · 学员专属 · 持续更新"
 - Featured prompts grid (6 cards)
 - Category tiles (icon + name + count)
 - Search bar prominent at top
@@ -342,7 +342,7 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 NEXT_PUBLIC_SITE_URL=
-ADMIN_EMAIL_ALLOWLIST=jay@bigai.my,reeve@bigai.my
+ADMIN_EMAIL_ALLOWLIST=jay@example.com,reeve@example.com
 ```
 
 ---

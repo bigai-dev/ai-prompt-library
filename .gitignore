@@ -37,3 +37,9 @@ supabase/.temp/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# playwright mcp cache
+.playwright-mcp/
+
+# dev screenshots
+screenshots/

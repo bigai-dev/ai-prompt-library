@@ -1,4 +1,4 @@
-# AI Prompt Library — Big AI Sdn Bhd
+# AI Prompt Library
 
 ## Project
 A web-based AI Prompt Library for Vibe Coding workshop students (Malaysian Chinese SME owners). Browse, search, filter, and copy proven prompts with variable substitution.
@@ -15,7 +15,7 @@ A web-based AI Prompt Library for Vibe Coding workshop students (Malaysian Chine
 Malaysian Chinese SME owners attending Vibe Coding workshops. Non-technical business operators who need to grab a prompt, fill in their details, and paste it into a Vibe Coding tool. Speed and clarity are paramount.
 
 ### Brand Personality
-Professional, Empowering, Approachable. Big AI is the trusted Vibe Coding authority in Southeast Asia — a knowledgeable mentor who respects the boss's time.
+Professional, Empowering, Approachable. The trusted Vibe Coding authority in Southeast Asia — a knowledgeable mentor who respects the boss's time.
 
 ### Aesthetic Direction
 Clean & Structured. White background, dark navy (#0F172A) code blocks, yellow/gold (#FCD34D) accent used sparingly for CTAs and callouts, slate text. Inter + Noto Sans SC typography. Generous whitespace, subtle card borders, pill badges for metadata.
@@ -88,7 +88,7 @@ src/
 - Never use `<link>` or `@import` for fonts
 
 ### Metadata
-- Root layout: title template `%s | Big AI Prompt Library`
+- Root layout: title template `%s | Vibe Coding Learning Hub`
 - Dynamic `generateMetadata` on `/prompt/[slug]` pages for SEO
 - Use `react.cache()` to deduplicate data fetches between metadata and page
 - Static `opengraph-image.tsx` for site-wide OG, dynamic per-prompt OG later
