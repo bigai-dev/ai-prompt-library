@@ -20,10 +20,20 @@ export async function GET(request: NextRequest) {
   if (category) {
     query = query.eq("category.slug", category);
   }
+  // Full-text search via tsvector RPC, with ILIKE fallback
+  let searchRankedIds: string[] | null = null;
   if (q) {
-    query = query.or(
-      `title_zh.ilike.%${q}%,title_en.ilike.%${q}%,subtitle.ilike.%${q}%`
-    );
+    const { data: searchResults } = await supabase.rpc("search_prompts", {
+      search_query: q,
+    });
+    if (searchResults && searchResults.length > 0) {
+      searchRankedIds = searchResults.map((r: { id: string }) => r.id);
+      query = query.in("id", searchRankedIds as string[]);
+    } else {
+      query = query.or(
+        `title_zh.ilike.%${q}%,title_en.ilike.%${q}%,subtitle.ilike.%${q}%,prompt_body.ilike.%${q}%`
+      );
+    }
   }
   if (tag) {
     const { data: tagData } = await supabase
@@ -49,26 +59,36 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  switch (sort) {
-    case "popular":
-      query = query.order("times_copied", { ascending: false });
-      break;
-    case "recent":
-      query = query.order("created_at", { ascending: false });
-      break;
-    case "rating":
-      query = query.order("rating", { ascending: false });
-      break;
-    default:
-      query = query.order("times_copied", { ascending: false });
+  if (!searchRankedIds) {
+    switch (sort) {
+      case "popular":
+        query = query.order("times_copied", { ascending: false });
+        break;
+      case "recent":
+        query = query.order("created_at", { ascending: false });
+        break;
+      case "rating":
+        query = query.order("rating", { ascending: false });
+        break;
+      default:
+        query = query.order("times_copied", { ascending: false });
+    }
   }
 
   query = query.range(offset, offset + limit - 1);
 
-  const { data, error, count } = await query;
+  let { data, error, count } = await query;
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  // Re-sort by relevance rank when tsvector matched
+  if (searchRankedIds && data) {
+    const rankMap = new Map(searchRankedIds.map((id, i) => [id, i]));
+    data = [...data].sort(
+      (a, b) => (rankMap.get(a.id) ?? 999) - (rankMap.get(b.id) ?? 999)
+    );
   }
 
   return NextResponse.json({ data, count });

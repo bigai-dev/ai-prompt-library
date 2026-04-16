@@ -34,6 +34,8 @@ import {
   Mail,
   Copy,
   Check,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { FilterPills } from "@/components/admin-filters";
 import { toast } from "sonner";
@@ -62,6 +64,11 @@ export function AdminUserList({ users }: { users: AuthUser[] }) {
   // Add user form state
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [passwordMode, setPasswordMode] = useState<"auto" | "manual">("auto");
+  const [manualPassword, setManualPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [resultMode, setResultMode] = useState<"auto" | "manual">("auto");
 
   const query = filter.toLowerCase();
   const filtered = users.filter((u) => {
@@ -82,12 +89,32 @@ export function AdminUserList({ users }: { users: AuthUser[] }) {
     e.preventDefault();
     if (!name.trim() || !email.trim()) return;
 
+    if (passwordMode === "manual") {
+      if (manualPassword.length < 8) {
+        toast.error("Password must be at least 8 characters");
+        return;
+      }
+      if (manualPassword !== confirmPassword) {
+        toast.error("Passwords do not match");
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
+      const payload: Record<string, string> = {
+        name: name.trim(),
+        email: email.trim(),
+        mode: passwordMode,
+      };
+      if (passwordMode === "manual") {
+        payload.password = manualPassword;
+      }
+
       const res = await fetch("/api/v1/admin/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), email: email.trim() }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
 
@@ -98,17 +125,24 @@ export function AdminUserList({ users }: { users: AuthUser[] }) {
 
       if (data.warning) {
         toast.warning(data.warning);
+      } else if (data.mode === "manual") {
+        toast.success("User created with custom password");
       } else {
         toast.success("User created and welcome email sent");
       }
 
-      // Show password result dialog
-      setResultPassword(data.password);
+      // Show result dialog
+      setResultMode(data.mode || "auto");
+      setResultPassword(data.password || "");
       setResultEmail(email.trim());
       setAddOpen(false);
       setResultOpen(true);
       setName("");
       setEmail("");
+      setPasswordMode("auto");
+      setManualPassword("");
+      setConfirmPassword("");
+      setShowPassword(false);
       router.refresh();
     } catch {
       toast.error("Failed to create user");
@@ -276,7 +310,15 @@ export function AdminUserList({ users }: { users: AuthUser[] }) {
       </div>
 
       {/* Add User Dialog */}
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+      <Dialog open={addOpen} onOpenChange={(open) => {
+        setAddOpen(open);
+        if (!open) {
+          setPasswordMode("auto");
+          setManualPassword("");
+          setConfirmPassword("");
+          setShowPassword(false);
+        }
+      }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add New User</DialogTitle>
@@ -303,9 +345,88 @@ export function AdminUserList({ users }: { users: AuthUser[] }) {
                 required
               />
             </div>
+
+            {/* Password mode toggle */}
+            <div className="space-y-3">
+              <Label>Password</Label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPasswordMode("auto")}
+                  className={`flex-1 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                    passwordMode === "auto"
+                      ? "border-slate-900 bg-slate-900 text-white"
+                      : "hover:bg-secondary"
+                  }`}
+                >
+                  <div className="font-medium">Auto-generate</div>
+                  <div className={`text-xs ${passwordMode === "auto" ? "text-slate-300" : "text-muted-foreground"}`}>
+                    Email + forced reset
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPasswordMode("manual")}
+                  className={`flex-1 rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                    passwordMode === "manual"
+                      ? "border-slate-900 bg-slate-900 text-white"
+                      : "hover:bg-secondary"
+                  }`}
+                >
+                  <div className="font-medium">Set manually</div>
+                  <div className={`text-xs ${passwordMode === "manual" ? "text-slate-300" : "text-muted-foreground"}`}>
+                    No email, no reset
+                  </div>
+                </button>
+              </div>
+
+              {passwordMode === "manual" && (
+                <div className="space-y-3 rounded-lg border border-dashed p-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="user-password">Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="user-password"
+                        type={showPassword ? "text" : "password"}
+                        value={manualPassword}
+                        onChange={(e) => setManualPassword(e.target.value)}
+                        placeholder="Min 8 characters"
+                        minLength={8}
+                        required
+                        className="pr-9"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="user-password-confirm">Confirm Password</Label>
+                    <Input
+                      id="user-password-confirm"
+                      type={showPassword ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Re-enter password"
+                      minLength={8}
+                      required
+                    />
+                    {confirmPassword && manualPassword !== confirmPassword && (
+                      <p className="text-xs text-destructive">Passwords do not match</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
             <p className="text-xs text-muted-foreground">
-              A random password will be generated and sent to this email.
-              The user must reset their password on first login.
+              {passwordMode === "auto"
+                ? "A random password will be generated and sent to this email. The user must reset their password on first login."
+                : "No email will be sent. Share this password with the user directly (e.g. via WhatsApp)."}
             </p>
             <div className="flex justify-end gap-2">
               <Button
@@ -315,7 +436,10 @@ export function AdminUserList({ users }: { users: AuthUser[] }) {
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={submitting}>
+              <Button
+                type="submit"
+                disabled={submitting || (passwordMode === "manual" && (manualPassword.length < 8 || manualPassword !== confirmPassword))}
+              >
                 {submitting ? "Creating..." : "Create User"}
               </Button>
             </div>
@@ -330,35 +454,58 @@ export function AdminUserList({ users }: { users: AuthUser[] }) {
             <DialogTitle>User Created</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              The welcome email has been sent. You can also copy the temporary
-              password below to share manually (e.g. via WhatsApp).
-            </p>
-            {resultEmail && (
-              <div className="text-sm">
-                <span className="text-muted-foreground">Email: </span>
-                <span className="font-medium">{resultEmail}</span>
-              </div>
-            )}
-            <div className="flex items-center gap-2">
-              <Input
-                value={resultPassword}
-                readOnly
-                className="font-mono text-sm"
-              />
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={copyPassword}
-                className="shrink-0"
-              >
-                {copied ? (
-                  <Check className="h-4 w-4 text-emerald-500" />
-                ) : (
-                  <Copy className="h-4 w-4" />
+            {resultMode === "manual" ? (
+              <>
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                  <p className="text-sm font-medium text-emerald-800">
+                    User created with your custom password.
+                  </p>
+                  <p className="mt-1 text-xs text-emerald-600">
+                    No email was sent. The user can log in immediately — no password reset required.
+                  </p>
+                </div>
+                {resultEmail && (
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Email: </span>
+                    <span className="font-medium">{resultEmail}</span>
+                  </div>
                 )}
-              </Button>
-            </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  The welcome email has been sent. You can also copy the temporary
+                  password below to share manually (e.g. via WhatsApp).
+                </p>
+                {resultEmail && (
+                  <div className="text-sm">
+                    <span className="text-muted-foreground">Email: </span>
+                    <span className="font-medium">{resultEmail}</span>
+                  </div>
+                )}
+                {resultPassword && (
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={resultPassword}
+                      readOnly
+                      className="font-mono text-sm"
+                    />
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={copyPassword}
+                      className="shrink-0"
+                    >
+                      {copied ? (
+                        <Check className="h-4 w-4 text-emerald-500" />
+                      ) : (
+                        <Copy className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
             <Button onClick={() => setResultOpen(false)} className="w-full">
               Done
             </Button>

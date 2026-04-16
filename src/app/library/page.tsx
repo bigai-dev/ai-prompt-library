@@ -1,8 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
+import { Suspense } from "react";
 import { Header } from "@/components/header";
 import { PromptCard } from "@/components/prompt-card";
 import { LibraryFilters } from "@/components/library-filters";
+import { SearchInput } from "@/components/search-input";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { PromptWithCategory, Category, Tag, Industry } from "@/types/database";
 
@@ -102,10 +104,21 @@ export default async function LibraryPage({
     }
   }
 
+  // Full-text search via tsvector RPC, with ILIKE fallback
+  let searchRankedIds: string[] | null = null;
   if (q) {
-    query = query.or(
-      `title_zh.ilike.%${q}%,title_en.ilike.%${q}%,subtitle.ilike.%${q}%`
-    );
+    const { data: searchResults } = await supabase.rpc("search_prompts", {
+      search_query: q,
+    });
+    if (searchResults && searchResults.length > 0) {
+      searchRankedIds = searchResults.map((r: { id: string }) => r.id);
+      query = query.in("id", searchRankedIds as string[]);
+    } else {
+      // Fallback: ILIKE catches partial/substring matches tsvector misses
+      query = query.or(
+        `title_zh.ilike.%${q}%,title_en.ilike.%${q}%,subtitle.ilike.%${q}%,prompt_body.ilike.%${q}%`
+      );
+    }
   }
 
   if (tag) {
@@ -144,27 +157,38 @@ export default async function LibraryPage({
     }
   }
 
-  switch (sort) {
-    case "recent":
-      query = query.order("created_at", { ascending: false });
-      break;
-    case "rating":
-      query = query
-        .order("rating", { ascending: false })
-        .order("created_at", { ascending: false });
-      break;
-    default:
-      query = query
-        .order("times_copied", { ascending: false })
-        .order("created_at", { ascending: false });
+  // When tsvector matched, skip normal sort — we'll reorder by relevance after fetch
+  if (!searchRankedIds) {
+    switch (sort) {
+      case "recent":
+        query = query.order("created_at", { ascending: false });
+        break;
+      case "rating":
+        query = query
+          .order("rating", { ascending: false })
+          .order("created_at", { ascending: false });
+        break;
+      default:
+        query = query
+          .order("times_copied", { ascending: false })
+          .order("created_at", { ascending: false });
+    }
   }
 
   const from = (currentPage - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
   query = query.range(from, to);
 
-  const { data: prompts, count } = await query;
+  let { data: prompts, count } = await query;
   const totalPages = Math.ceil((count || 0) / PAGE_SIZE);
+
+  // Re-sort by relevance rank when tsvector matched
+  if (searchRankedIds && prompts) {
+    const rankMap = new Map(searchRankedIds.map((id, i) => [id, i]));
+    prompts = [...prompts].sort(
+      (a, b) => (rankMap.get(a.id) ?? 999) - (rankMap.get(b.id) ?? 999)
+    );
+  }
 
   return (
     <>
@@ -183,7 +207,7 @@ export default async function LibraryPage({
 
           {/* Main Content */}
           <div className="flex-1">
-            <div className="mb-6 flex items-center justify-between">
+            <div className="mb-4 flex items-center justify-between">
               <h1 className="text-2xl font-bold">
                 {category
                   ? categories.find((c) => c.slug === category)?.name_en || "Template Library"
@@ -193,15 +217,16 @@ export default async function LibraryPage({
                     · {industries.find((i) => i.slug === industry)?.name_en}
                   </span>
                 )}
-                {q && (
-                  <span className="ml-2 text-base font-normal text-muted-foreground">
-                    Search: &ldquo;{q}&rdquo;
-                  </span>
-                )}
               </h1>
               <span className="text-sm text-muted-foreground">
                 {count || 0} templates
               </span>
+            </div>
+
+            <div className="mb-6">
+              <Suspense fallback={<div className="h-10 w-full animate-pulse rounded-lg bg-muted" />}>
+                <SearchInput />
+              </Suspense>
             </div>
 
             {(prompts || []).length === 0 ? (
