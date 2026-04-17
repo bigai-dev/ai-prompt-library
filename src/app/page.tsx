@@ -13,6 +13,8 @@ import {
   Play,
   Clock,
   Users,
+  Stethoscope,
+  Sparkles,
 } from "lucide-react";
 import type { PromptWithCategory } from "@/types/database";
 import { getLocale, getTranslations } from "next-intl/server";
@@ -38,7 +40,12 @@ export default async function HomePage() {
     supabase
       .from("site_settings")
       .select("key, value")
-      .in("key", ["library_enabled", "courses_enabled", "feedback_enabled"]),
+      .in("key", [
+        "library_enabled",
+        "courses_enabled",
+        "feedback_enabled",
+        "diagnostic_enabled",
+      ]),
   ]);
 
   const prompts = (promptsRes.data || []) as PromptWithCategory[];
@@ -52,6 +59,9 @@ export default async function HomePage() {
   const libraryEnabled = settingsMap.library_enabled !== "false";
   const coursesEnabled = settingsMap.courses_enabled !== "false";
   const feedbackEnabled = settingsMap.feedback_enabled !== "false";
+  const diagnosticEnabled = settingsMap.diagnostic_enabled !== "false";
+
+  const tDiag = await getTranslations("diagnostic");
 
   // Aggregate course stats
   const totalCourses = MOCK_COURSES.length;
@@ -82,12 +92,14 @@ export default async function HomePage() {
             </div>
 
             {/* CTA cards — adapt grid based on enabled modules */}
-            {(coursesEnabled || libraryEnabled) && (
+            {(coursesEnabled || libraryEnabled || diagnosticEnabled) && (
               <div
                 className={`mx-auto grid gap-4 ${
-                  coursesEnabled && libraryEnabled
-                    ? "max-w-2xl sm:grid-cols-2"
-                    : "max-w-md"
+                  [coursesEnabled, libraryEnabled, diagnosticEnabled].filter(Boolean).length === 3
+                    ? "max-w-5xl sm:grid-cols-3"
+                    : [coursesEnabled, libraryEnabled, diagnosticEnabled].filter(Boolean).length === 2
+                      ? "max-w-2xl sm:grid-cols-2"
+                      : "max-w-md"
                 }`}
               >
                 {coursesEnabled && (
@@ -152,6 +164,39 @@ export default async function HomePage() {
                       <span className="flex items-center gap-1">
                         <Users className="h-3 w-3" />
                         {t("cardPromptsCategories")}
+                      </span>
+                    </div>
+                    <div className="absolute bottom-6 right-6 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition-all group-hover:bg-yellow-400 group-hover:text-white">
+                      <ArrowRight className="h-4 w-4" />
+                    </div>
+                  </Link>
+                )}
+
+                {diagnosticEnabled && (
+                  <Link
+                    href="/diagnostic"
+                    className="group relative overflow-hidden rounded-2xl border-2 border-slate-200 bg-white p-6 transition-all hover:border-yellow-300 hover:shadow-lg"
+                  >
+                    <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-600 text-white">
+                      <Stethoscope className="h-6 w-6" />
+                    </div>
+                    <h2 className="mb-1 text-xl font-bold text-slate-900">
+                      {tDiag("cardTitle")}
+                    </h2>
+                    <p className="mb-1 text-sm font-medium text-slate-600">
+                      {tDiag("cardSubtitle")}
+                    </p>
+                    <p className="mb-4 text-sm text-slate-500">
+                      {tDiag("cardDesc")}
+                    </p>
+                    <div className="flex items-center gap-3 text-xs text-slate-500">
+                      <span className="flex items-center gap-1">
+                        <Sparkles className="h-3 w-3" />
+                        {tDiag("cardMeta1")}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {tDiag("cardMeta2")}
                       </span>
                     </div>
                     <div className="absolute bottom-6 right-6 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition-all group-hover:bg-yellow-400 group-hover:text-white">
@@ -247,7 +292,7 @@ export default async function HomePage() {
             </div>
 
             {/* Learn */}
-            {(coursesEnabled || libraryEnabled) && (
+            {(coursesEnabled || libraryEnabled || diagnosticEnabled) && (
               <div>
                 <h4 className="mb-3 text-sm font-semibold text-white">
                   {t("footerLearn")}
@@ -273,6 +318,13 @@ export default async function HomePage() {
                         </Link>
                       </li>
                     </>
+                  )}
+                  {diagnosticEnabled && (
+                    <li>
+                      <Link href="/diagnostic" className="transition-colors hover:text-white">
+                        {tDiag("cardTitle")}
+                      </Link>
+                    </li>
                   )}
                 </ul>
               </div>

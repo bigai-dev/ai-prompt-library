@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Zap, Video, LogOut, User } from "lucide-react";
+import { Zap, Video, LogOut, User, Stethoscope } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
@@ -19,6 +19,8 @@ export function Header() {
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [libraryEnabled, setLibraryEnabled] = useState(true);
   const [coursesEnabled, setCoursesEnabled] = useState(true);
+  const [diagnosticEnabled, setDiagnosticEnabled] = useState(true);
+  const tDiag = useTranslations("diagnostic");
 
   useEffect(() => {
     const supabase = createClient();
@@ -39,6 +41,7 @@ export function Header() {
       .then((s: Record<string, string>) => {
         setLibraryEnabled(s.library_enabled !== "false");
         setCoursesEnabled(s.courses_enabled !== "false");
+        setDiagnosticEnabled(s.diagnostic_enabled !== "false");
       })
       .catch(() => {
         // Silent fallback — default to enabled
@@ -90,6 +93,18 @@ export function Header() {
             >
               <Video className="h-4 w-4" />
               <span className="hidden sm:inline">{t("courses")}</span>
+            </Link>
+          )}
+          {diagnosticEnabled && (
+            <Link
+              href="/diagnostic"
+              className={cn(
+                "flex items-center gap-1 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-secondary",
+                pathname.startsWith("/diagnostic") && "bg-secondary"
+              )}
+            >
+              <Stethoscope className="h-4 w-4" />
+              <span className="hidden sm:inline">{tDiag("navLabel")}</span>
             </Link>
           )}
         </nav>

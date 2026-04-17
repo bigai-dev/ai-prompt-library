@@ -45,6 +45,7 @@ export async function updateSession(request: NextRequest) {
       "library_enabled",
       "courses_enabled",
       "feedback_enabled",
+      "diagnostic_enabled",
     ]);
   const settings: Record<string, string> = {};
   (settingsRows || []).forEach((r) => {
@@ -55,6 +56,7 @@ export async function updateSession(request: NextRequest) {
   const libraryEnabled = settings.library_enabled !== "false";
   const coursesEnabled = settings.courses_enabled !== "false";
   const feedbackEnabled = settings.feedback_enabled !== "false";
+  const diagnosticEnabled = settings.diagnostic_enabled !== "false";
 
   if (authRequired) {
     // Public paths that don't require authentication
@@ -93,11 +95,13 @@ export async function updateSession(request: NextRequest) {
       path === "/favorites";
     const isCoursesPath = path === "/courses" || path.startsWith("/courses/");
     const isFeedbackPath = path === "/feedback";
+    const isDiagnosticPath = path === "/diagnostic" || path.startsWith("/diagnostic/");
 
     if (
       (isLibraryPath && !libraryEnabled) ||
       (isCoursesPath && !coursesEnabled) ||
-      (isFeedbackPath && !feedbackEnabled)
+      (isFeedbackPath && !feedbackEnabled) ||
+      (isDiagnosticPath && !diagnosticEnabled)
     ) {
       const url = request.nextUrl.clone();
       url.pathname = "/";

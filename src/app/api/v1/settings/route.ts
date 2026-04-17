@@ -5,7 +5,12 @@ import { createAdminClient } from "@/lib/supabase/admin";
 // these toggles control UI visibility, not security.
 // Auth (auth_required) is NOT returned here — only via the admin route.
 
-const PUBLIC_KEYS = ["library_enabled", "courses_enabled", "feedback_enabled"] as const;
+const PUBLIC_KEYS = [
+  "library_enabled",
+  "courses_enabled",
+  "feedback_enabled",
+  "diagnostic_enabled",
+] as const;
 
 export async function GET() {
   const supabase = createAdminClient();

@@ -12,10 +12,12 @@ import {
   VideoOff,
   MessageSquare,
   MessageSquareOff,
+  Stethoscope,
+  CircleOff,
 } from "lucide-react";
 import { toast } from "sonner";
 
-type SettingKey = "auth_required" | "library_enabled" | "courses_enabled" | "feedback_enabled";
+type SettingKey = "auth_required" | "library_enabled" | "courses_enabled" | "feedback_enabled" | "diagnostic_enabled";
 
 interface ToggleDef {
   key: SettingKey;
@@ -73,6 +75,17 @@ const TOGGLES: ToggleDef[] = [
     disabledIcon: MessageSquareOff,
     enabledButtonText: "Hide Feedback",
     disabledButtonText: "Show Feedback",
+  },
+  {
+    key: "diagnostic_enabled",
+    enabledLabel: "Diagnostic Visible",
+    disabledLabel: "Diagnostic Hidden",
+    enabledDesc: "Automation diagnostic tool is visible to all users",
+    disabledDesc: "Automation diagnostic tool is hidden from users",
+    enabledIcon: Stethoscope,
+    disabledIcon: CircleOff,
+    enabledButtonText: "Hide Diagnostic",
+    disabledButtonText: "Show Diagnostic",
   },
 ];
 
