@@ -1,6 +1,6 @@
 "use client";
 
-import { Header } from "@/components/header";
+import { HeaderClient } from "@/components/header-client";
 
 export default function Error({
   error,
@@ -9,9 +9,12 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  // Error boundaries must be client components, so we can't use the async
+  // server Header. Show all nav links by default — if a module is actually
+  // disabled, clicking it redirects to / via middleware anyway.
   return (
     <>
-      <Header />
+      <HeaderClient libraryEnabled coursesEnabled diagnosticEnabled />
       <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center">
         <h1 className="mb-2 text-2xl font-bold">Something went wrong</h1>
         <p className="mb-6 text-muted-foreground">

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Header } from "@/components/header";
 import { LessonPlayer } from "@/components/lesson-player";
 import { LessonSidebar } from "@/components/lesson-sidebar";
 import type { MockCourse, MockLesson } from "@/lib/mock-courses";
@@ -22,7 +21,6 @@ export function LessonPageClient({
 
   return (
     <>
-      <Header />
       <div className="flex min-h-[calc(100vh-4rem)]">
         {/* Sidebar — desktop only */}
         <aside className="hidden w-80 shrink-0 overflow-y-auto border-r bg-white lg:block">

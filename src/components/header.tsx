@@ -1,144 +1,25 @@
-"use client";
+import { createClient } from "@/lib/supabase/server";
+import { HeaderClient } from "./header-client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Zap, Video, LogOut, User, Stethoscope, Library } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import type { User as SupabaseUser } from "@supabase/supabase-js";
-import { useTranslations } from "next-intl";
-import { LocaleSwitcher } from "@/components/locale-switcher";
+// Async Server Component — pre-fetches module visibility so the first paint
+// already has the correct nav links (no flash of now-hidden Courses link etc).
+export async function Header() {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("site_settings")
+    .select("key, value")
+    .in("key", ["library_enabled", "courses_enabled", "diagnostic_enabled"]);
 
-export function Header() {
-  const pathname = usePathname();
-  const router = useRouter();
-  const t = useTranslations("header");
-  const [user, setUser] = useState<SupabaseUser | null>(null);
-  const [libraryEnabled, setLibraryEnabled] = useState(true);
-  const [coursesEnabled, setCoursesEnabled] = useState(true);
-  const [diagnosticEnabled, setDiagnosticEnabled] = useState(true);
-  const tDiag = useTranslations("diagnostic");
-
-  useEffect(() => {
-    const supabase = createClient();
-
-    supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user);
-    });
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    // Fetch module visibility settings
-    fetch("/api/v1/settings")
-      .then((r) => r.json())
-      .then((s: Record<string, string>) => {
-        setLibraryEnabled(s.library_enabled !== "false");
-        setCoursesEnabled(s.courses_enabled !== "false");
-        setDiagnosticEnabled(s.diagnostic_enabled !== "false");
-      })
-      .catch(() => {
-        // Silent fallback — default to enabled
-      });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const handleLogout = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/");
-    router.refresh();
-  };
-
-  if (pathname.startsWith("/admin")) return null;
-
-  const displayName = user?.user_metadata?.full_name || user?.email;
+  const settings: Record<string, string> = {};
+  (data || []).forEach((r) => {
+    settings[r.key] = r.value;
+  });
 
   return (
-    <header className="sticky top-0 z-50 border-b bg-white/80 backdrop-blur-sm">
-      <div className="mx-auto flex h-16 max-w-7xl items-center gap-6 px-4">
-        <Link href="/" className="flex items-center gap-2 font-semibold">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-            <Zap className="h-5 w-5 text-primary-foreground" />
-          </div>
-          <span className="hidden sm:inline">Vibe Coding</span>
-        </Link>
-
-        <nav className="flex items-center gap-1">
-          {libraryEnabled && (
-            <Link
-              href="/library"
-              className={cn(
-                "flex items-center gap-1 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-secondary",
-                pathname.startsWith("/library") && "bg-secondary"
-              )}
-            >
-              <Library className="h-4 w-4" />
-              <span className="hidden sm:inline">{t("library")}</span>
-            </Link>
-          )}
-          {coursesEnabled && (
-            <Link
-              href="/courses"
-              className={cn(
-                "flex items-center gap-1 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-secondary",
-                pathname.startsWith("/courses") && "bg-secondary"
-              )}
-            >
-              <Video className="h-4 w-4" />
-              <span className="hidden sm:inline">{t("courses")}</span>
-            </Link>
-          )}
-          {diagnosticEnabled && (
-            <Link
-              href="/diagnostic"
-              className={cn(
-                "flex items-center gap-1 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-secondary",
-                pathname.startsWith("/diagnostic") && "bg-secondary"
-              )}
-            >
-              <Stethoscope className="h-4 w-4" />
-              <span className="hidden sm:inline">{tDiag("navLabel")}</span>
-            </Link>
-          )}
-        </nav>
-
-        {/* Right side: locale switcher + auth */}
-        <div className="ml-auto flex items-center gap-1">
-          <LocaleSwitcher />
-          {user ? (
-            <div className="flex items-center gap-1 border-l pl-3 ml-2">
-              <span className="hidden items-center gap-1.5 text-sm text-muted-foreground sm:flex">
-                <User className="h-3.5 w-3.5" />
-                {displayName}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleLogout}
-                className="gap-1.5 text-muted-foreground"
-              >
-                <LogOut className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{t("logout")}</span>
-              </Button>
-            </div>
-          ) : (
-            <Link
-              href="/login"
-              className="ml-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-secondary"
-            >
-              {t("login")}
-            </Link>
-          )}
-        </div>
-      </div>
-    </header>
+    <HeaderClient
+      libraryEnabled={settings.library_enabled !== "false"}
+      coursesEnabled={settings.courses_enabled !== "false"}
+      diagnosticEnabled={settings.diagnostic_enabled !== "false"}
+    />
   );
 }

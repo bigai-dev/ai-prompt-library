@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { findCourse, findLesson } from "@/lib/mock-courses";
+import { Header } from "@/components/header";
 import { LessonPageClient } from "./lesson-page-client";
 
 export default async function LessonPage({
@@ -15,5 +16,10 @@ export default async function LessonPage({
   const found = findLesson(course, lessonSlug);
   if (!found) notFound();
 
-  return <LessonPageClient course={course} lesson={found.lesson} />;
+  return (
+    <>
+      <Header />
+      <LessonPageClient course={course} lesson={found.lesson} />
+    </>
+  );
 }
