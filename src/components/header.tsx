@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Zap, Video, LogOut, User, Stethoscope } from "lucide-react";
+import { Zap, Video, LogOut, User, Stethoscope, Library } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
@@ -76,11 +76,12 @@ export function Header() {
             <Link
               href="/library"
               className={cn(
-                "rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-secondary",
+                "flex items-center gap-1 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-secondary",
                 pathname.startsWith("/library") && "bg-secondary"
               )}
             >
-              {t("library")}
+              <Library className="h-4 w-4" />
+              <span className="hidden sm:inline">{t("library")}</span>
             </Link>
           )}
           {coursesEnabled && (
