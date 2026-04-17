@@ -8,9 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Lock } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
+  const t = useTranslations("resetPassword");
+  const tc = useTranslations("common");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
@@ -44,12 +47,12 @@ export default function ResetPasswordPage() {
     setError("");
 
     if (password.length < 8) {
-      setError("Password must be at least 8 characters");
+      setError(t("passwordTooShort"));
       return;
     }
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      setError(t("passwordMismatch"));
       return;
     }
 
@@ -65,7 +68,7 @@ export default function ResetPasswordPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "Failed to reset password");
+        setError(data.error || tc("error"));
         setLoading(false);
         return;
       }
@@ -86,7 +89,7 @@ export default function ResetPasswordPage() {
       router.push("/");
       router.refresh();
     } catch {
-      setError("Something went wrong. Please try again.");
+      setError(tc("error"));
       setLoading(false);
     }
   };
@@ -94,7 +97,7 @@ export default function ResetPasswordPage() {
   if (checking) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <p className="text-muted-foreground">Loading...</p>
+        <p className="text-muted-foreground">{tc("loading")}</p>
       </div>
     );
   }
@@ -107,9 +110,9 @@ export default function ResetPasswordPage() {
             <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-yellow-400">
               <Lock className="h-6 w-6 text-white" />
             </div>
-            <h1 className="text-xl font-bold">Set Your Password</h1>
+            <h1 className="text-xl font-bold">{t("title")}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              You must set a new password before continuing.
+              {t("subtitle")}
             </p>
           </div>
 
@@ -120,19 +123,18 @@ export default function ResetPasswordPage() {
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="new-password">New Password</Label>
+              <Label htmlFor="new-password">{t("newPasswordLabel")}</Label>
               <Input
                 id="new-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="At least 8 characters"
                 required
                 minLength={8}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirm-password">Confirm Password</Label>
+              <Label htmlFor="confirm-password">{t("confirmPasswordLabel")}</Label>
               <Input
                 id="confirm-password"
                 type="password"
@@ -143,7 +145,7 @@ export default function ResetPasswordPage() {
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Updating..." : "Set Password"}
+              {loading ? t("submitting") : t("submitButton")}
             </Button>
           </form>
         </CardContent>

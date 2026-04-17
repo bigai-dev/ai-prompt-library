@@ -7,6 +7,9 @@ import { LibraryFilters } from "@/components/library-filters";
 import { SearchInput } from "@/components/search-input";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { PromptWithCategory, Category, Tag, Industry } from "@/types/database";
+import { getLocale, getTranslations } from "next-intl/server";
+import type { Locale } from "@/i18n/routing";
+import { localizedField } from "@/i18n/utils";
 
 const PAGE_SIZE = 12;
 
@@ -33,6 +36,8 @@ export default async function LibraryPage({
   searchParams: Promise<{ category?: string; q?: string; sort?: string; tag?: string; industry?: string; page?: string }>;
 }) {
   const supabase = await createClient();
+  const locale = (await getLocale()) as Locale;
+  const t = await getTranslations("library");
 
   const { category, q, sort = "popular", tag, industry, page: pageParam } = await searchParams;
   const currentPage = Math.max(1, parseInt(pageParam || "1", 10));
@@ -78,7 +83,7 @@ export default async function LibraryPage({
             </aside>
             <div className="flex-1">
               <div className="py-16 text-center text-muted-foreground">
-                No matching templates found
+                {t("noResults")}
               </div>
             </div>
           </div>
@@ -146,7 +151,7 @@ export default async function LibraryPage({
                 </aside>
                 <div className="flex-1">
                   <div className="py-16 text-center text-muted-foreground">
-                    No matching templates found
+                    {t("noResults")}
                   </div>
                 </div>
               </div>
@@ -210,16 +215,16 @@ export default async function LibraryPage({
             <div className="mb-4 flex items-center justify-between">
               <h1 className="text-2xl font-bold">
                 {category
-                  ? categories.find((c) => c.slug === category)?.name_en || "Template Library"
-                  : "All Templates"}
+                  ? localizedField(categories.find((c) => c.slug === category), "name", locale) || t("pageTitle")
+                  : t("allTemplates")}
                 {industry && (
                   <span className="ml-2 text-base font-normal text-muted-foreground">
-                    · {industries.find((i) => i.slug === industry)?.name_en}
+                    · {localizedField(industries.find((i) => i.slug === industry), "name", locale)}
                   </span>
                 )}
               </h1>
               <span className="text-sm text-muted-foreground">
-                {count || 0} templates
+                {t("resultCount", { count: count || 0 })}
               </span>
             </div>
 
@@ -231,13 +236,13 @@ export default async function LibraryPage({
 
             {(prompts || []).length === 0 ? (
               <div className="py-16 text-center text-muted-foreground">
-                No matching templates found
+                {t("noResults")}
               </div>
             ) : (
               <>
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                   {(prompts as PromptWithCategory[]).map((prompt) => (
-                    <PromptCard key={prompt.id} prompt={prompt} />
+                    <PromptCard key={prompt.id} prompt={prompt} locale={locale} />
                   ))}
                 </div>
 

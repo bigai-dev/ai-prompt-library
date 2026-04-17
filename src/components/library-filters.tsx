@@ -5,6 +5,9 @@ import { usePathname } from "next/navigation";
 import { Heart } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Category, Tag, Industry } from "@/types/database";
+import { useLocale, useTranslations } from "next-intl";
+import type { Locale } from "@/i18n/routing";
+import { localizedField } from "@/i18n/utils";
 
 interface FiltersProps {
   categories: Category[];
@@ -22,6 +25,9 @@ interface FiltersProps {
 export function LibraryFilters({ categories, tags, industries, current }: FiltersProps) {
   const pathname = usePathname();
   const isFavorites = pathname === "/favorites";
+  const locale = useLocale() as Locale;
+  const t = useTranslations("filters");
+  const tLib = useTranslations("library");
 
   function buildUrl(params: Record<string, string | undefined>) {
     const merged = { ...current, ...params };
@@ -45,19 +51,19 @@ export function LibraryFilters({ categories, tags, industries, current }: Filter
         )}
       >
         <Heart className={cn("h-5 w-5", isFavorites ? "fill-slate-900 text-slate-900" : "fill-yellow-400 text-yellow-400")} />
-        My Favorites
+        {tLib("viewFavorites")}
       </Link>
 
       <div className="border-t" />
 
       {/* Sort */}
       <div>
-        <h3 className="mb-2 text-sm font-semibold text-muted-foreground">Sort</h3>
+        <h3 className="mb-2 text-sm font-semibold text-muted-foreground">{t("sort")}</h3>
         <div className="flex flex-col gap-1">
           {[
-            { value: "popular", label: "Most Copied" },
-            { value: "recent", label: "Newest" },
-            { value: "rating", label: "Highest Rated" },
+            { value: "popular", label: t("sortPopular") },
+            { value: "recent", label: t("sortRecent") },
+            { value: "rating", label: t("sortRating") },
           ].map(({ value, label }) => (
             <Link
               key={value}
@@ -76,7 +82,7 @@ export function LibraryFilters({ categories, tags, industries, current }: Filter
 
       {/* Industry */}
       <div>
-        <h3 className="mb-2 text-sm font-semibold text-muted-foreground">Industry</h3>
+        <h3 className="mb-2 text-sm font-semibold text-muted-foreground">{t("industry")}</h3>
         <div className="flex flex-col gap-1">
           <Link
             href={buildUrl({ industry: undefined })}
@@ -85,7 +91,7 @@ export function LibraryFilters({ categories, tags, industries, current }: Filter
               !current.industry && "bg-secondary font-medium"
             )}
           >
-            All Industries
+            {t("allIndustries")}
           </Link>
           {industries.map((ind) => (
             <Link
@@ -96,7 +102,7 @@ export function LibraryFilters({ categories, tags, industries, current }: Filter
                 current.industry === ind.slug && "bg-secondary font-medium"
               )}
             >
-              {ind.name_en}
+              {localizedField(ind, "name", locale)}
             </Link>
           ))}
         </div>
@@ -104,7 +110,7 @@ export function LibraryFilters({ categories, tags, industries, current }: Filter
 
       {/* Categories */}
       <div>
-        <h3 className="mb-2 text-sm font-semibold text-muted-foreground">Category</h3>
+        <h3 className="mb-2 text-sm font-semibold text-muted-foreground">{t("category")}</h3>
         <div className="flex flex-col gap-1">
           <Link
             href={buildUrl({ category: undefined })}
@@ -113,7 +119,7 @@ export function LibraryFilters({ categories, tags, industries, current }: Filter
               !current.category && "bg-secondary font-medium"
             )}
           >
-            All
+            {t("allCategories")}
           </Link>
           {categories.map((cat) => (
             <Link
@@ -124,7 +130,7 @@ export function LibraryFilters({ categories, tags, industries, current }: Filter
                 current.category === cat.slug && "bg-secondary font-medium"
               )}
             >
-              {cat.name_en}
+              {localizedField(cat, "name", locale)}
             </Link>
           ))}
         </div>
@@ -132,20 +138,20 @@ export function LibraryFilters({ categories, tags, industries, current }: Filter
 
       {/* Tags */}
       <div>
-        <h3 className="mb-2 text-sm font-semibold text-muted-foreground">Tags</h3>
+        <h3 className="mb-2 text-sm font-semibold text-muted-foreground">{t("tags")}</h3>
         <div className="flex flex-wrap gap-1.5">
-          {tags.map((t) => (
+          {tags.map((tag) => (
             <Link
-              key={t.id}
-              href={buildUrl({ tag: current.tag === t.slug ? undefined : t.slug })}
+              key={tag.id}
+              href={buildUrl({ tag: current.tag === tag.slug ? undefined : tag.slug })}
               className={cn(
                 "rounded-full border px-2.5 py-0.5 text-xs transition-colors hover:border-yellow-300",
-                current.tag === t.slug
+                current.tag === tag.slug
                   ? "border-yellow-400 bg-yellow-50 font-medium"
                   : "border-border"
               )}
             >
-              {t.name}
+              {tag.name}
             </Link>
           ))}
         </div>

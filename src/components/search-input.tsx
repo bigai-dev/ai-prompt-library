@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Search, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export function SearchInput() {
   const router = useRouter();
@@ -12,6 +13,7 @@ export function SearchInput() {
   const [inputValue, setInputValue] = useState(currentQ);
   const inputRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const t = useTranslations("library");
 
   // Sync when URL changes externally (back button, filter clicks)
   useEffect(() => {
@@ -61,7 +63,7 @@ export function SearchInput() {
       <Input
         ref={inputRef}
         type="text"
-        placeholder="Search templates..."
+        placeholder={t("searchPlaceholder")}
         value={inputValue}
         onChange={handleChange}
         onKeyDown={handleKeyDown}

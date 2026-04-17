@@ -15,9 +15,14 @@ import {
   Users,
 } from "lucide-react";
 import type { PromptWithCategory } from "@/types/database";
+import { getLocale, getTranslations } from "next-intl/server";
+import type { Locale } from "@/i18n/routing";
 
 export default async function HomePage() {
   const supabase = await createClient();
+  const locale = (await getLocale()) as Locale;
+  const t = await getTranslations("home");
+  const tc = await getTranslations("common");
 
   const [promptsRes, promptCountRes, settingsRes] = await Promise.all([
     supabase
@@ -63,16 +68,16 @@ export default async function HomePage() {
             <div className="text-center">
               <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-yellow-200 bg-yellow-50 px-4 py-1.5 text-sm font-medium text-yellow-800">
                 <Zap className="h-3.5 w-3.5" />
-                Workshop Students Only
+                {t("heroBadge")}
               </div>
               <h1 className="mb-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl">
-                Vibe Coding
-                <span className="block text-yellow-600">Learning Hub</span>
+                {t("heroTitle1")}
+                <span className="block text-yellow-600">{t("heroTitle2")}</span>
               </h1>
               <p className="mx-auto mb-10 max-w-xl text-base text-slate-600 sm:text-lg">
-                Video courses and prompt templates to master AI-assisted coding.
+                {t("heroTagline1")}
                 <br className="hidden sm:block" />
-                Built for SME owners — no coding experience needed.
+                {t("heroTagline2")}
               </p>
             </div>
 
@@ -94,27 +99,26 @@ export default async function HomePage() {
                       <Play className="h-6 w-6" />
                     </div>
                     <h2 className="mb-1 text-xl font-bold text-slate-900">
-                      Video Courses
+                      {t("cardCoursesTitle")}
                     </h2>
                     <p className="mb-1 text-sm font-medium text-slate-600">
-                      视频课程
+                      {t("cardCoursesSubtitle")}
                     </p>
                     <p className="mb-4 text-sm text-slate-500">
-                      Watch step-by-step Loom videos and track your progress through
-                      each course.
+                      {t("cardCoursesDesc")}
                     </p>
                     <div className="flex items-center gap-3 text-xs text-slate-500">
                       <span className="flex items-center gap-1">
                         <BookOpen className="h-3 w-3" />
-                        {totalCourses} courses
+                        {t("cardCoursesCourses", { count: totalCourses })}
                       </span>
                       <span className="flex items-center gap-1">
                         <FileText className="h-3 w-3" />
-                        {totalLessons} lessons
+                        {t("cardCoursesLessons", { count: totalLessons })}
                       </span>
                       <span className="flex items-center gap-1">
                         <Clock className="h-3 w-3" />
-                        {totalMinutes} min
+                        {t("cardCoursesMinutes", { count: totalMinutes })}
                       </span>
                     </div>
                     <div className="absolute bottom-6 right-6 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition-all group-hover:bg-yellow-400 group-hover:text-white">
@@ -132,23 +136,22 @@ export default async function HomePage() {
                       <FileText className="h-6 w-6" />
                     </div>
                     <h2 className="mb-1 text-xl font-bold text-slate-900">
-                      Prompt Templates
+                      {t("cardPromptsTitle")}
                     </h2>
                     <p className="mb-1 text-sm font-medium text-slate-600">
-                      提示词模板
+                      {t("cardPromptsSubtitle")}
                     </p>
                     <p className="mb-4 text-sm text-slate-500">
-                      Copy-paste AI prompts for quotations, emails, data analysis,
-                      and more.
+                      {t("cardPromptsDesc")}
                     </p>
                     <div className="flex items-center gap-3 text-xs text-slate-500">
                       <span className="flex items-center gap-1">
                         <FileText className="h-3 w-3" />
-                        {promptCount}+ templates
+                        {t("cardPromptsTemplates", { count: promptCount })}
                       </span>
                       <span className="flex items-center gap-1">
                         <Users className="h-3 w-3" />
-                        8 categories
+                        {t("cardPromptsCategories")}
                       </span>
                     </div>
                     <div className="absolute bottom-6 right-6 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition-all group-hover:bg-yellow-400 group-hover:text-white">
@@ -170,17 +173,17 @@ export default async function HomePage() {
             <div className="mb-6 flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-bold text-slate-900">
-                  Video Courses
+                  {t("sectionCoursesTitle")}
                 </h2>
                 <p className="text-sm text-slate-500">
-                  Step-by-step video lessons at your own pace
+                  {t("sectionCoursesSubtitle")}
                 </p>
               </div>
               <Link
                 href="/courses"
                 className="flex items-center gap-1 text-sm font-medium text-yellow-600 hover:text-yellow-700"
               >
-                View All
+                {tc("viewAll")}
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
@@ -205,23 +208,23 @@ export default async function HomePage() {
             <div className="mb-6 flex items-center justify-between">
               <div>
                 <h2 className="text-xl font-bold text-slate-900">
-                  Popular Prompts
+                  {t("sectionPromptsTitle")}
                 </h2>
                 <p className="text-sm text-slate-500">
-                  Ready-to-use templates for Cursor, Claude, and v0
+                  {t("sectionPromptsSubtitle")}
                 </p>
               </div>
               <Link
                 href="/library"
                 className="flex items-center gap-1 text-sm font-medium text-yellow-600 hover:text-yellow-700"
               >
-                Browse All
+                {tc("browseAll")}
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {prompts.map((prompt) => (
-                <PromptCard key={prompt.id} prompt={prompt} />
+                <PromptCard key={prompt.id} prompt={prompt} locale={locale} />
               ))}
             </div>
           </section>
@@ -240,22 +243,20 @@ export default async function HomePage() {
                 </div>
                 <span className="font-bold text-white">Vibe Coding</span>
               </div>
-              <p className="text-sm leading-relaxed">
-                AI-assisted coding for SME owners.
-                <br />
-                No coding experience needed.
-              </p>
+              <p className="text-sm leading-relaxed">{t("footerBrand")}</p>
             </div>
 
             {/* Learn */}
             {(coursesEnabled || libraryEnabled) && (
               <div>
-                <h4 className="mb-3 text-sm font-semibold text-white">Learn</h4>
+                <h4 className="mb-3 text-sm font-semibold text-white">
+                  {t("footerLearn")}
+                </h4>
                 <ul className="space-y-2 text-sm">
                   {coursesEnabled && (
                     <li>
                       <Link href="/courses" className="transition-colors hover:text-white">
-                        Video Courses
+                        {t("footerVideoCourses")}
                       </Link>
                     </li>
                   )}
@@ -263,12 +264,12 @@ export default async function HomePage() {
                     <>
                       <li>
                         <Link href="/library" className="transition-colors hover:text-white">
-                          Prompt Library
+                          {t("footerPromptLibrary")}
                         </Link>
                       </li>
                       <li>
                         <Link href="/favorites" className="transition-colors hover:text-white">
-                          My Favorites
+                          {t("footerFavorites")}
                         </Link>
                       </li>
                     </>
@@ -280,11 +281,13 @@ export default async function HomePage() {
             {/* Support */}
             {feedbackEnabled && (
               <div>
-                <h4 className="mb-3 text-sm font-semibold text-white">Support</h4>
+                <h4 className="mb-3 text-sm font-semibold text-white">
+                  {t("footerSupport")}
+                </h4>
                 <ul className="space-y-2 text-sm">
                   <li>
                     <Link href="/feedback" className="transition-colors hover:text-white">
-                      Submit Feedback
+                      {t("footerFeedback")}
                     </Link>
                   </li>
                 </ul>
@@ -293,8 +296,8 @@ export default async function HomePage() {
           </div>
 
           <div className="mt-10 border-t border-slate-800 pt-6 text-center text-xs text-slate-500">
-            <p>Built with Vibe Coding</p>
-            <p className="mt-1">© {new Date().getFullYear()} Vibe Coding Learning Hub</p>
+            <p>{t("footerBuiltWith")}</p>
+            <p className="mt-1">{t("footerCopyright", { year: new Date().getFullYear() })}</p>
           </div>
         </div>
       </footer>

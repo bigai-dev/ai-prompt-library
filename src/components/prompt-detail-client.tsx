@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { Copy, Check, Clock, Star, Eye, RotateCcw, Sparkles, ExternalLink, Globe } from "lucide-react";
+import { Copy, Check, Clock, Star, Eye, RotateCcw, Sparkles, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -11,39 +11,35 @@ import { FavoriteButton } from "@/components/favorite-button";
 import { toast } from "sonner";
 import { getAnonId } from "@/lib/anon-id";
 import type { PromptWithCategory, PromptVariable, Tag } from "@/types/database";
-
-type Lang = "en" | "zh";
+import { useTranslations } from "next-intl";
+import type { Locale } from "@/i18n/routing";
+import { localizedField, localizedBody, localizedDefaultValue } from "@/i18n/utils";
 
 interface Props {
   prompt: PromptWithCategory;
   variables: PromptVariable[];
   tags: Tag[];
+  locale: Locale;
 }
 
-export function PromptDetailClient({ prompt, variables, tags }: Props) {
-  const hasEnglish = !!prompt.prompt_body_en;
-  const [lang, setLang] = useState<Lang>("en");
+export function PromptDetailClient({ prompt, variables, tags, locale }: Props) {
+  const t = useTranslations("prompt");
   const [values, setValues] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState(false);
   const [viewLogged, setViewLogged] = useState(false);
 
-  // Active prompt body based on selected language
-  const activeBody = useMemo(() => {
-    if (lang === "en" && hasEnglish) return prompt.prompt_body_en!;
-    return prompt.prompt_body;
-  }, [lang, hasEnglish, prompt.prompt_body, prompt.prompt_body_en]);
+  // Pick body and title based on global locale
+  const activeBody = useMemo(() => localizedBody(prompt, locale), [prompt, locale]);
+  const promptTitle = useMemo(() => localizedField(prompt, "title", locale), [prompt, locale]);
 
-  // Reset defaults when language changes
+  // Initialize / reset defaults when locale changes
   useEffect(() => {
     const defaults: Record<string, string> = {};
     variables.forEach((v) => {
-      defaults[v.key] =
-        lang === "en" && v.default_value_en
-          ? v.default_value_en
-          : v.default_value;
+      defaults[v.key] = localizedDefaultValue(v, locale);
     });
     setValues(defaults);
-  }, [variables, lang]);
+  }, [variables, locale]);
 
   useEffect(() => {
     if (viewLogged) return;
@@ -73,7 +69,7 @@ export function PromptDetailClient({ prompt, variables, tags }: Props) {
   const handleCopy = useCallback(async () => {
     await navigator.clipboard.writeText(substitutedBody);
     setCopied(true);
-    toast.success("Copied to clipboard");
+    toast.success(t("copied"));
 
     fetch(`/api/v1/prompts/${prompt.id}/copy`, {
       method: "POST",
@@ -82,18 +78,15 @@ export function PromptDetailClient({ prompt, variables, tags }: Props) {
     }).catch(() => {});
 
     setTimeout(() => setCopied(false), 2000);
-  }, [substitutedBody, prompt.id]);
+  }, [substitutedBody, prompt.id, t]);
 
   const handleReset = useCallback(() => {
     const defaults: Record<string, string> = {};
     variables.forEach((v) => {
-      defaults[v.key] =
-        lang === "en" && v.default_value_en
-          ? v.default_value_en
-          : v.default_value;
+      defaults[v.key] = localizedDefaultValue(v, locale);
     });
     setValues(defaults);
-  }, [variables, lang]);
+  }, [variables, locale]);
 
   const updateValue = useCallback((key: string, value: string) => {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -140,7 +133,7 @@ export function PromptDetailClient({ prompt, variables, tags }: Props) {
       <div>
         <div className="flex items-start justify-between gap-3">
           <h1 className="text-2xl font-bold leading-tight sm:text-3xl">
-            {prompt.title_en}
+            {promptTitle}
           </h1>
           <FavoriteButton promptId={prompt.id} className="mt-1 shrink-0" />
         </div>
@@ -152,7 +145,7 @@ export function PromptDetailClient({ prompt, variables, tags }: Props) {
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
           <span className="flex items-center gap-1">
             <Clock className="h-3.5 w-3.5" />
-            {prompt.estimated_minutes} min
+            {t("minutes", { count: prompt.estimated_minutes })}
           </span>
           <span>{prompt.version}</span>
           <Separator orientation="vertical" className="!h-4" />
@@ -184,34 +177,6 @@ export function PromptDetailClient({ prompt, variables, tags }: Props) {
         )}
       </div>
 
-      {/* ── Language Toggle + Action Buttons ── */}
-      {hasEnglish && (
-        <div className="flex items-center gap-1 rounded-lg bg-secondary p-1 w-fit">
-          <button
-            onClick={() => setLang("en")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              lang === "en"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Globe className="h-3.5 w-3.5" />
-            English
-          </button>
-          <button
-            onClick={() => setLang("zh")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-              lang === "zh"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <Globe className="h-3.5 w-3.5" />
-            中文
-          </button>
-        </div>
-      )}
-
       <div className="flex gap-3">
         <button
           onClick={handleCopy}
@@ -222,7 +187,7 @@ export function PromptDetailClient({ prompt, variables, tags }: Props) {
           ) : (
             <Copy className="h-5 w-5" />
           )}
-          {copied ? "Copied to clipboard" : "Copy Prompt"}
+          {copied ? t("copied") : t("copyButton")}
         </button>
 
         {prompt.example_output && (
@@ -233,30 +198,19 @@ export function PromptDetailClient({ prompt, variables, tags }: Props) {
             className="flex items-center gap-2 rounded-xl border-2 border-yellow-300 bg-yellow-50 px-5 py-3 text-base font-semibold text-yellow-700 shadow-sm transition-all hover:border-yellow-400 hover:bg-yellow-100 hover:shadow-md active:scale-[0.98]"
           >
             <Sparkles className="h-5 w-5" />
-            Preview UI
+            {t("previewTitle")}
             <ExternalLink className="h-4 w-4" />
           </a>
         )}
       </div>
 
-      {prompt.example_output && (
-        <p className="text-xs text-muted-foreground -mt-4">
-          * Preview is for reference only. Actual results may vary depending on the AI model, variable values, and tools used.
-        </p>
-      )}
-
       {/* ── Prompt Body ── */}
       <div>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-            Prompt Content
-            {hasEnglish && (
-              <span className="ml-2 text-xs font-normal normal-case">
-                ({lang === "en" ? "English" : "Chinese"})
-              </span>
-            )}
+            {t("promptBodyTitle")}
           </h2>
-          <span className="text-xs text-muted-foreground">{wordCount} words</span>
+          <span className="text-xs text-muted-foreground">{t("wordCount", { count: wordCount })}</span>
         </div>
         <div className="overflow-hidden rounded-xl border border-slate-800">
           <pre className="max-h-[600px] overflow-auto bg-[hsl(var(--code-block-bg))] p-5 text-sm leading-relaxed text-[hsl(var(--code-block-fg))]">
@@ -283,14 +237,14 @@ export function PromptDetailClient({ prompt, variables, tags }: Props) {
         <div>
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Variables
+              {t("variablesTitle")}
             </h2>
             <button
               onClick={handleReset}
               className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
             >
               <RotateCcw className="h-3 w-3" />
-              Reset defaults
+              {t("resetButton")}
             </button>
           </div>
           <div className="rounded-xl border p-5">
@@ -303,7 +257,7 @@ export function PromptDetailClient({ prompt, variables, tags }: Props) {
                   }
                 >
                   <Label className="mb-1.5 block text-sm font-medium">
-                    {v.label_en}
+                    {localizedField(v as unknown as Record<string, unknown>, "label", locale)}
                   </Label>
                   {v.input_type === "textarea" ? (
                     <Textarea

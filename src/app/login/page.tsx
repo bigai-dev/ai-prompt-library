@@ -8,9 +8,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Zap } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export default function LoginPage() {
   const router = useRouter();
+  const t = useTranslations("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -50,9 +52,9 @@ export default function LoginPage() {
             <div className="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
               <Zap className="h-6 w-6 text-primary-foreground" />
             </div>
-            <h1 className="text-xl font-bold">Log In</h1>
+            <h1 className="text-xl font-bold">{t("title")}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              Vibe Coding Learning Hub
+              {t("subtitle")}
             </p>
           </div>
 
@@ -63,7 +65,7 @@ export default function LoginPage() {
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t("emailLabel")}</Label>
               <Input
                 id="email"
                 type="email"
@@ -74,7 +76,7 @@ export default function LoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t("passwordLabel")}</Label>
               <Input
                 id="password"
                 type="password"
@@ -84,13 +86,9 @@ export default function LoginPage() {
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Logging in..." : "Log In"}
+              {loading ? t("loggingIn") : t("loginButton")}
             </Button>
           </form>
-
-          <div className="mt-5 rounded-lg bg-slate-50 p-3 text-center text-[11px] leading-relaxed text-slate-400">
-            This account is for your personal use only. Sharing your login credentials with others is strictly prohibited. Violations will result in access being revoked.
-          </div>
         </CardContent>
       </Card>
     </div>

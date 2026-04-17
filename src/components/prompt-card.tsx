@@ -3,14 +3,21 @@ import { Clock, Star, Copy } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { FavoriteButton } from "@/components/favorite-button";
 import type { PromptWithCategory } from "@/types/database";
+import type { Locale } from "@/i18n/routing";
+import { localizedField } from "@/i18n/utils";
 
 export function PromptCard({
   prompt,
   compact,
+  locale = "zh",
 }: {
   prompt: PromptWithCategory;
   compact?: boolean;
+  locale?: Locale;
 }) {
+  const title = localizedField(prompt, "title", locale);
+  const categoryName = localizedField(prompt.category, "name", locale);
+
   if (compact) {
     return (
       <Link href={`/prompt/${prompt.slug}`}>
@@ -18,11 +25,11 @@ export function PromptCard({
           <CardContent className="p-3.5">
             <div className="mb-1 flex items-center gap-1.5">
               <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-secondary-foreground">
-                {prompt.category?.name_en}
+                {categoryName}
               </span>
             </div>
             <h3 className="text-sm font-medium leading-snug group-hover:text-yellow-600 transition-colors">
-              {prompt.title_en}
+              {title}
             </h3>
           </CardContent>
         </Card>
@@ -39,12 +46,12 @@ export function PromptCard({
         <CardContent className="flex h-full flex-col p-5">
           <div className="mb-3 flex items-center gap-2">
             <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium text-secondary-foreground">
-              {prompt.category?.name_en}
+              {categoryName}
             </span>
           </div>
 
           <h3 className="mb-1 font-semibold leading-snug group-hover:text-yellow-600 transition-colors line-clamp-2">
-            {prompt.title_en}
+            {title}
           </h3>
           <p className="mb-3 text-sm text-muted-foreground line-clamp-2">
             {prompt.subtitle}

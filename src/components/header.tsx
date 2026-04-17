@@ -9,10 +9,13 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
+import { useTranslations } from "next-intl";
+import { LocaleSwitcher } from "@/components/locale-switcher";
 
 export function Header() {
   const pathname = usePathname();
   const router = useRouter();
+  const t = useTranslations("header");
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [libraryEnabled, setLibraryEnabled] = useState(true);
   const [coursesEnabled, setCoursesEnabled] = useState(true);
@@ -74,7 +77,7 @@ export function Header() {
                 pathname.startsWith("/library") && "bg-secondary"
               )}
             >
-              Library
+              {t("library")}
             </Link>
           )}
           {coursesEnabled && (
@@ -86,13 +89,14 @@ export function Header() {
               )}
             >
               <Video className="h-4 w-4" />
-              <span className="hidden sm:inline">Courses</span>
+              <span className="hidden sm:inline">{t("courses")}</span>
             </Link>
           )}
         </nav>
 
-        {/* Right side: auth */}
+        {/* Right side: locale switcher + auth */}
         <div className="ml-auto flex items-center gap-1">
+          <LocaleSwitcher />
           {user ? (
             <div className="flex items-center gap-1 border-l pl-3 ml-2">
               <span className="hidden items-center gap-1.5 text-sm text-muted-foreground sm:flex">
@@ -106,7 +110,7 @@ export function Header() {
                 className="gap-1.5 text-muted-foreground"
               >
                 <LogOut className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Log Out</span>
+                <span className="hidden sm:inline">{t("logout")}</span>
               </Button>
             </div>
           ) : (
@@ -114,7 +118,7 @@ export function Header() {
               href="/login"
               className="ml-2 rounded-md px-3 py-2 text-sm font-medium transition-colors hover:bg-secondary"
             >
-              Log In
+              {t("login")}
             </Link>
           )}
         </div>

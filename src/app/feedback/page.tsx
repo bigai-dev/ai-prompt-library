@@ -9,20 +9,23 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { MessageSquare, Send, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
-
-const CATEGORIES = [
-  { value: "general", label: "General Feedback" },
-  { value: "bug", label: "Bug Report" },
-  { value: "feature", label: "Feature Request" },
-  { value: "content", label: "Content Suggestion" },
-];
+import { useTranslations } from "next-intl";
 
 export default function FeedbackPage() {
   const router = useRouter();
+  const t = useTranslations("feedback");
+  const tc = useTranslations("common");
   const [category, setCategory] = useState("general");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+
+  const CATEGORIES = [
+    { value: "general", label: t("categoryOther") },
+    { value: "bug", label: t("categoryBug") },
+    { value: "feature", label: t("categoryFeature") },
+    { value: "content", label: t("categoryContent") },
+  ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,13 +41,13 @@ export default function FeedbackPage() {
 
       if (!res.ok) {
         const data = await res.json();
-        toast.error(data.error || "Failed to submit feedback");
+        toast.error(data.error || t("errorMessage"));
         return;
       }
 
       setSubmitted(true);
     } catch {
-      toast.error("Something went wrong. Please try again.");
+      toast.error(t("errorMessage"));
     } finally {
       setSubmitting(false);
     }
@@ -60,13 +63,12 @@ export default function FeedbackPage() {
               <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100">
                 <CheckCircle2 className="h-7 w-7 text-emerald-600" />
               </div>
-              <h1 className="mb-2 text-xl font-bold">Thank You!</h1>
+              <h1 className="mb-2 text-xl font-bold">{t("successTitle")}</h1>
               <p className="mb-6 text-sm text-muted-foreground">
-                Your feedback has been submitted. We appreciate you taking
-                the time to help us improve.
+                {t("successMessage")}
               </p>
               <Button onClick={() => router.push("/")} variant="outline">
-                Back to Home
+                {tc("back")}
               </Button>
             </CardContent>
           </Card>
@@ -76,11 +78,9 @@ export default function FeedbackPage() {
               <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-900">
                 <MessageSquare className="h-6 w-6 text-yellow-400" />
               </div>
-              <h1 className="text-2xl font-bold">Submit Feedback</h1>
+              <h1 className="text-2xl font-bold">{t("pageTitle")}</h1>
               <p className="mt-2 text-sm text-muted-foreground">
-                Have a suggestion, found a bug, or want to request a feature?
-                <br />
-                We&apos;d love to hear from you.
+                {t("pageSubtitle")}
               </p>
             </div>
 
@@ -89,7 +89,7 @@ export default function FeedbackPage() {
                 <form onSubmit={handleSubmit} className="space-y-5">
                   {/* Category */}
                   <div className="space-y-2">
-                    <Label>Category</Label>
+                    <Label>{t("categoryLabel")}</Label>
                     <div className="flex flex-wrap gap-2">
                       {CATEGORIES.map((cat) => (
                         <button
@@ -110,12 +110,12 @@ export default function FeedbackPage() {
 
                   {/* Message */}
                   <div className="space-y-2">
-                    <Label htmlFor="message">Your Feedback</Label>
+                    <Label htmlFor="message">{t("messageLabel")}</Label>
                     <Textarea
                       id="message"
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
-                      placeholder="Tell us what's on your mind..."
+                      placeholder={t("messagePlaceholder")}
                       rows={5}
                       required
                     />
@@ -127,7 +127,7 @@ export default function FeedbackPage() {
                     disabled={submitting || !message.trim()}
                   >
                     <Send className="h-4 w-4" />
-                    {submitting ? "Submitting..." : "Submit Feedback"}
+                    {submitting ? t("submitting") : t("submitButton")}
                   </Button>
                 </form>
               </CardContent>

@@ -11,6 +11,9 @@ import type {
   Tag,
 } from "@/types/database";
 import { cache } from "react";
+import { getLocale, getTranslations } from "next-intl/server";
+import type { Locale } from "@/i18n/routing";
+import { localizedField } from "@/i18n/utils";
 
 const getPrompt = cache(async (slug: string) => {
   const supabase = await createClient();
@@ -33,9 +36,10 @@ export async function generateMetadata({
   const { slug } = await params;
   const prompt = await getPrompt(slug);
   if (!prompt) return { title: "Not Found" };
+  const locale = (await getLocale()) as Locale;
 
   return {
-    title: prompt.title_en,
+    title: localizedField(prompt, "title", locale) || prompt.title_en,
     description: prompt.subtitle,
   };
 }
@@ -49,6 +53,8 @@ export default async function PromptDetailPage({
   const prompt = await getPrompt(slug);
   if (!prompt) notFound();
 
+  const locale = (await getLocale()) as Locale;
+  const t = await getTranslations("prompt");
   const supabase = await createClient();
 
   const [variablesRes, tagsRes, relatedRes] = await Promise.all([
@@ -86,6 +92,9 @@ export default async function PromptDetailPage({
     relatedPrompts = (data || []) as PromptWithCategory[];
   }
 
+  const promptTitle = localizedField(prompt, "title", locale);
+  const categoryName = localizedField(prompt.category, "name", locale);
+
   return (
     <>
       <Header />
@@ -93,18 +102,18 @@ export default async function PromptDetailPage({
         {/* Breadcrumb */}
         <nav className="mb-6 flex items-center gap-1.5 text-sm text-muted-foreground">
           <Link href="/library" className="hover:text-foreground transition-colors">
-            All Templates
+            {t("breadcrumbAll")}
           </Link>
           <span className="text-border">/</span>
           <Link
             href={`/library?category=${prompt.category?.slug}`}
             className="hover:text-foreground transition-colors"
           >
-            {prompt.category?.name_en}
+            {categoryName}
           </Link>
           <span className="text-border">/</span>
           <span className="truncate text-foreground font-medium">
-            {prompt.title_en}
+            {promptTitle}
           </span>
         </nav>
 
@@ -116,6 +125,7 @@ export default async function PromptDetailPage({
               prompt={prompt}
               variables={variables}
               tags={tags}
+              locale={locale}
             />
           </div>
 
@@ -125,14 +135,14 @@ export default async function PromptDetailPage({
               {/* Usage Steps */}
               <div className="rounded-xl border bg-card p-5">
                 <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                  How to Use
+                  {t("stepsTitle")}
                 </h3>
                 <ol className="space-y-4">
                   {[
-                    { step: "1", title: "Fill in Variables", desc: "Replace placeholders with your info on the left" },
-                    { step: "2", title: "Live Preview", desc: "The preview updates automatically" },
-                    { step: "3", title: "Copy Prompt", desc: "Click the yellow button to copy" },
-                    { step: "4", title: "Paste & Use", desc: "Open Cursor / Claude and paste" },
+                    { step: "1", title: t("step1"), desc: t("step1Desc") },
+                    { step: "2", title: t("step2"), desc: t("step2Desc") },
+                    { step: "3", title: t("step3"), desc: t("step3Desc") },
+                    { step: "4", title: t("step4"), desc: t("step4Desc") },
                   ].map(({ step, title, desc }) => (
                     <li key={step} className="flex gap-3">
                       <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
@@ -155,7 +165,7 @@ export default async function PromptDetailPage({
               {prompt.boss_tip && (
                 <div className="rounded-xl border border-[hsl(var(--boss-tip-border))] bg-[hsl(var(--boss-tip-bg))] p-5">
                   <h3 className="mb-2 text-sm font-semibold">
-                    💡 Pro Tip
+                    💡 {t("bossTipTitle")}
                   </h3>
                   <p className="text-sm leading-relaxed text-muted-foreground">
                     {prompt.boss_tip}
@@ -167,11 +177,11 @@ export default async function PromptDetailPage({
               {relatedPrompts.length > 0 && (
                 <div>
                   <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                    Related Templates
+                    {t("relatedTitle")}
                   </h3>
                   <div className="space-y-3">
                     {relatedPrompts.slice(0, 3).map((rp) => (
-                      <PromptCard key={rp.id} prompt={rp} compact />
+                      <PromptCard key={rp.id} prompt={rp} compact locale={locale} />
                     ))}
                   </div>
                 </div>
