@@ -36,8 +36,10 @@ import {
   Check,
   Eye,
   EyeOff,
+  Upload,
 } from "lucide-react";
 import { FilterPills } from "@/components/admin-filters";
+import { BulkImportDialog } from "@/components/admin-bulk-import-dialog";
 import { toast } from "sonner";
 
 interface AuthUser {
@@ -55,6 +57,7 @@ export function AdminUserList({ users }: { users: AuthUser[] }) {
   const [filter, setFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [addOpen, setAddOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [resultOpen, setResultOpen] = useState(false);
   const [resultPassword, setResultPassword] = useState("");
   const [resultEmail, setResultEmail] = useState("");
@@ -203,11 +206,27 @@ export function AdminUserList({ users }: { users: AuthUser[] }) {
     <div>
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold">User Management</h1>
-        <Button onClick={() => setAddOpen(true)} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Add User
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setBulkOpen(true)}
+            className="gap-2"
+          >
+            <Upload className="h-4 w-4" />
+            Bulk Import
+          </Button>
+          <Button onClick={() => setAddOpen(true)} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Add User
+          </Button>
+        </div>
       </div>
+
+      <BulkImportDialog
+        open={bulkOpen}
+        onOpenChange={setBulkOpen}
+        onComplete={() => router.refresh()}
+      />
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative max-w-xs flex-1">
