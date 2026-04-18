@@ -88,7 +88,7 @@
     "step2": "填写变量",
     "step2Desc": "替换方括号中的字段",
     "step3": "粘贴到 Vibe Coding 工具",
-    "step3Desc": "Cursor、v0 或 Claude",
+    "step3Desc": "",
     "step4": "部署",
     "step4Desc": "把你的 AI 应用推出上线",
     "bossTipTitle": "老板小贴士",

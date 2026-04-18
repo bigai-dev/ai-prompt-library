@@ -152,9 +152,11 @@ export default async function PromptDetailPage({
                         <div className="text-sm font-medium leading-none">
                           {title}
                         </div>
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          {desc}
-                        </div>
+                        {desc && (
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {desc}
+                          </div>
+                        )}
                       </div>
                     </li>
                   ))}

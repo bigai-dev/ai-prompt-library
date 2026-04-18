@@ -88,7 +88,7 @@
     "step2": "Fill in variables",
     "step2Desc": "Replace the bracketed fields",
     "step3": "Paste into Vibe Coding tool",
-    "step3Desc": "Cursor, v0, or Claude",
+    "step3Desc": "",
     "step4": "Deploy",
     "step4Desc": "Ship your AI app to production",
     "bossTipTitle": "Boss Tip",
