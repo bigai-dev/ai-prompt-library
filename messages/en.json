@@ -144,6 +144,7 @@
   "resetPassword": {
     "title": "Reset Password",
     "subtitle": "You need to reset your password to continue",
+    "subtitleRecovery": "Choose a new password for your account",
     "newPasswordLabel": "New Password",
     "confirmPasswordLabel": "Confirm New Password",
     "passwordMismatch": "Passwords do not match",
@@ -151,6 +152,15 @@
     "submitButton": "Reset Password",
     "submitting": "Resetting...",
     "successMessage": "Password updated"
+  },
+  "forgotPassword": {
+    "title": "Forgot Password",
+    "subtitle": "Enter your email and we'll send you a reset link",
+    "subtitleSent": "Check your inbox",
+    "emailLabel": "Email",
+    "submitButton": "Send Reset Link",
+    "checkEmail": "If an account exists for {email}, a password reset link has been sent. Check your inbox (and spam folder).",
+    "backToLogin": "Back to login"
   },
   "courses": {
     "pageTitle": "Video Courses",

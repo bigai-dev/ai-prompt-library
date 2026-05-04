@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -76,7 +77,15 @@ export default function LoginPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">{t("passwordLabel")}</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">{t("passwordLabel")}</Label>
+                <Link
+                  href="/forgot-password"
+                  className="text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                >
+                  {t("forgotPassword")}
+                </Link>
+              </div>
               <Input
                 id="password"
                 type="password"

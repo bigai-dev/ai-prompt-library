@@ -144,6 +144,7 @@
   "resetPassword": {
     "title": "重设密码",
     "subtitle": "你需要重设密码才能继续",
+    "subtitleRecovery": "为你的账户设置一个新密码",
     "newPasswordLabel": "新密码",
     "confirmPasswordLabel": "确认新密码",
     "passwordMismatch": "两次输入的密码不一致",
@@ -151,6 +152,15 @@
     "submitButton": "重设密码",
     "submitting": "重设中...",
     "successMessage": "密码已更新"
+  },
+  "forgotPassword": {
+    "title": "忘记密码",
+    "subtitle": "输入你的邮箱，我们会发送重设链接给你",
+    "subtitleSent": "请查收邮件",
+    "emailLabel": "邮箱",
+    "submitButton": "发送重设链接",
+    "checkEmail": "如果 {email} 存在账户，我们已发送密码重设链接，请查收邮箱（也别忘了看垃圾邮件）。",
+    "backToLogin": "返回登入"
   },
   "courses": {
     "pageTitle": "视频课程",

@@ -19,6 +19,7 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [forced, setForced] = useState(false);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -32,11 +33,7 @@ export default function ResetPasswordPage() {
         return;
       }
 
-      if (!user.user_metadata?.must_reset_password) {
-        router.push("/");
-        return;
-      }
-
+      setForced(user.user_metadata?.must_reset_password === true);
       setChecking(false);
     };
     checkUser();
@@ -112,7 +109,7 @@ export default function ResetPasswordPage() {
             </div>
             <h1 className="text-xl font-bold">{t("title")}</h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {t("subtitle")}
+              {forced ? t("subtitle") : t("subtitleRecovery")}
             </p>
           </div>
 
