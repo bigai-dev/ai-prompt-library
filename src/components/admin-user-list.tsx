@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Table,
@@ -63,6 +63,8 @@ export function AdminUserList({ users }: { users: AuthUser[] }) {
   const [resultEmail, setResultEmail] = useState("");
   const [copied, setCopied] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   // Add user form state
   const [name, setName] = useState("");
@@ -87,6 +89,17 @@ export function AdminUserList({ users }: { users: AuthUser[] }) {
 
   const activeCount = users.filter((u) => !u.user_metadata?.must_reset_password).length;
   const resetCount = users.filter((u) => u.user_metadata?.must_reset_password).length;
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, filtered.length);
+  const pageRows = filtered.slice(startIndex, endIndex);
+
+  // Reset to first page whenever filters or page size change
+  useEffect(() => {
+    setPage(1);
+  }, [filter, statusFilter, pageSize]);
 
   const handleAddUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -251,7 +264,7 @@ export function AdminUserList({ users }: { users: AuthUser[] }) {
         />
       </div>
 
-      <div className="rounded-xl border bg-white">
+      <div className="rounded-xl border bg-white overflow-hidden">
         <Table>
           <TableHeader>
             <TableRow>
@@ -273,7 +286,7 @@ export function AdminUserList({ users }: { users: AuthUser[] }) {
                 </TableCell>
               </TableRow>
             ) : (
-              filtered.map((user) => (
+              pageRows.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell className="font-medium">
                     {user.user_metadata?.full_name || "—"}
@@ -326,6 +339,54 @@ export function AdminUserList({ users }: { users: AuthUser[] }) {
             )}
           </TableBody>
         </Table>
+
+        {filtered.length > 0 && (
+          <div className="flex flex-col gap-3 border-t px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-muted-foreground">
+              Showing <span className="font-medium text-foreground">{startIndex + 1}</span>–<span className="font-medium text-foreground">{endIndex}</span> of <span className="font-medium text-foreground">{filtered.length}</span>
+              {filtered.length !== users.length && (
+                <span className="text-muted-foreground"> (filtered from {users.length})</span>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 text-muted-foreground">
+                Rows per page
+                <select
+                  value={pageSize}
+                  onChange={(e) => setPageSize(Number(e.target.value))}
+                  className="h-8 rounded-md border border-input bg-background px-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  {[10, 20, 50, 100].map((size) => (
+                    <option key={size} value={size}>
+                      {size}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage <= 1}
+                >
+                  Previous
+                </Button>
+                <span className="px-2 text-muted-foreground">
+                  Page <span className="font-medium text-foreground">{currentPage}</span> of <span className="font-medium text-foreground">{totalPages}</span>
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={currentPage >= totalPages}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Add User Dialog */}

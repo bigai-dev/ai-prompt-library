@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient, listAllUsers } from "@/lib/supabase/admin";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function GET(request: NextRequest) {
@@ -91,8 +91,8 @@ export async function GET(request: NextRequest) {
   });
 
   // Platform stats
-  const [usersRes, promptCountRes, feedbackRes] = await Promise.all([
-    admin.auth.admin.listUsers(),
+  const [allUsers, promptCountRes, feedbackRes] = await Promise.all([
+    listAllUsers(admin),
     supabase
       .from("prompts")
       .select("id", { count: "exact", head: true })
@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
   const adminEmails = (process.env.ADMIN_EMAIL_ALLOWLIST || "")
     .split(",")
     .map((e) => e.trim().toLowerCase());
-  const totalUsers = (usersRes.data?.users || []).filter(
+  const totalUsers = allUsers.filter(
     (u) => !adminEmails.includes(u.email?.toLowerCase() ?? "")
   ).length;
 

@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient, listAllUsers } from "@/lib/supabase/admin";
 import { sendWelcomeEmail } from "@/lib/email";
 import crypto from "crypto";
 
 export async function GET() {
   const supabase = createAdminClient();
-  const { data, error } = await supabase.auth.admin.listUsers();
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  let allUsers;
+  try {
+    allUsers = await listAllUsers(supabase);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to list users";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 
   // Filter out admin users — only show regular users
@@ -16,7 +18,7 @@ export async function GET() {
     .split(",")
     .map((e) => e.trim().toLowerCase());
 
-  const users = (data.users || []).filter(
+  const users = allUsers.filter(
     (u) => !adminEmails.includes(u.email?.toLowerCase() ?? "")
   );
 
