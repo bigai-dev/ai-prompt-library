@@ -107,6 +107,7 @@ Strict requirements:
           ],
           temperature: 0.7,
           max_tokens: 8192,
+          thinking: { type: "disabled" },
         }),
       });
 
