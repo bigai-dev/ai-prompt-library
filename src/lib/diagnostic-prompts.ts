@@ -140,9 +140,9 @@ Problems to solve:
 ${painLinesEn}
 
 Technical requirements:
-- Use simple HTML / CSS / JS + Node.js — no heavy frameworks
-- Use Supabase for any data storage
-- Must run locally first; deploy to Vercel later
+- Use Next.js (App Router) with TypeScript and Tailwind CSS for the UI
+- Use Supabase for any data storage and authentication
+- Deploy to Vercel (run locally first, then ship)
 
 Give me the high-level plan first; once I approve, write the code step by step.`;
   }
@@ -173,9 +173,9 @@ ${painLinesZh}
 ${painLinesZh}
 
 技术要求：
-- 用简单的 HTML/CSS/JS + Node.js，不要用复杂框架
-- 要存数据就用 Supabase
-- 电脑上可以跑，之后可以放上 Vercel
+- 用 Next.js（App Router）+ TypeScript + Tailwind CSS 做界面
+- 要存数据或登录就用 Supabase
+- 部署到 Vercel（先在电脑上跑通再上线）
 
 请先告诉我大概怎么做，我同意后再一步一步写代码。`;
 }
