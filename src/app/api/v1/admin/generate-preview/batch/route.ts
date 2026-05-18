@@ -2,15 +2,13 @@ import { createClient } from "@/lib/supabase/server";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(request: NextRequest) {
-  const apiKey = process.env.ARK_API_KEY;
-  const modelId = process.env.ARK_MODEL_ID;
-  const baseUrl =
-    process.env.ARK_BASE_URL ||
-    "https://ark.ap-southeast.bytepluses.com/api/v3";
+  const apiKey = process.env.DEEPSEEK_API_KEY;
+  const modelId = process.env.DEEPSEEK_MODEL || "deepseek-v4-flash";
+  const baseUrl = process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com";
 
-  if (!apiKey || !modelId) {
+  if (!apiKey) {
     return NextResponse.json(
-      { error: "ARK_API_KEY and ARK_MODEL_ID must be set in environment" },
+      { error: "DEEPSEEK_API_KEY must be set in environment" },
       { status: 500 }
     );
   }

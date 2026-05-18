@@ -234,11 +234,12 @@ console.log(`\nDone! ${created} created, ${updated} updated, ${failed} failed`);
 // ── Generate previews for prompts missing them ──
 const generatePreviews = process.argv.includes("--generate-previews");
 if (generatePreviews) {
-  const apiKey = env.ARK_API_KEY;
-  const modelId = env.ARK_MODEL_ID;
+  const apiKey = env.DEEPSEEK_API_KEY;
+  const modelId = env.DEEPSEEK_MODEL || "deepseek-v4-flash";
+  const baseUrl = env.DEEPSEEK_BASE_URL || "https://api.deepseek.com";
 
-  if (!apiKey || !modelId) {
-    console.log("\nSkipping preview generation (ARK_API_KEY / ARK_MODEL_ID not set)");
+  if (!apiKey) {
+    console.log("\nSkipping preview generation (DEEPSEEK_API_KEY not set)");
     process.exit(0);
   }
 
@@ -266,7 +267,7 @@ if (generatePreviews) {
     process.stdout.write(`Preview: ${prompt.slug} ... `);
     try {
       const res = await fetch(
-        "https://ark.ap-southeast.bytepluses.com/api/v3/chat/completions",
+        `${baseUrl}/chat/completions`,
         {
           method: "POST",
           headers: {
