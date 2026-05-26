@@ -1,4 +1,5 @@
 import { ModuleToggles } from "@/components/module-toggles";
+import { ChangePasswordCard } from "@/components/change-password-card";
 
 export const metadata = {
   title: "Settings",
@@ -14,8 +15,9 @@ export default function AdminSettingsPage() {
         </p>
       </div>
 
-      <div className="max-w-3xl">
+      <div className="max-w-3xl space-y-8">
         <ModuleToggles />
+        <ChangePasswordCard />
       </div>
     </div>
   );
