@@ -37,6 +37,7 @@ import {
   Eye,
   EyeOff,
   Upload,
+  KeyRound,
 } from "lucide-react";
 import { FilterPills } from "@/components/admin-filters";
 import { BulkImportDialog } from "@/components/admin-bulk-import-dialog";
@@ -74,6 +75,14 @@ export function AdminUserList({ users }: { users: AuthUser[] }) {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [resultMode, setResultMode] = useState<"auto" | "manual">("auto");
+
+  // Edit password dialog state
+  const [editPwOpen, setEditPwOpen] = useState(false);
+  const [editPwUser, setEditPwUser] = useState<AuthUser | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [editPwSubmitting, setEditPwSubmitting] = useState(false);
 
   const query = filter.toLowerCase();
   const filtered = users.filter((u) => {
@@ -191,6 +200,53 @@ export function AdminUserList({ users }: { users: AuthUser[] }) {
     }
 
     router.refresh();
+  };
+
+  const openEditPassword = (user: AuthUser) => {
+    setEditPwUser(user);
+    setNewPassword("");
+    setNewPasswordConfirm("");
+    setShowNewPassword(false);
+    setEditPwOpen(true);
+  };
+
+  const handleEditPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editPwUser) return;
+    if (newPassword.length < 8) {
+      toast.error("Password must be at least 8 characters");
+      return;
+    }
+    if (newPassword !== newPasswordConfirm) {
+      toast.error("Passwords do not match");
+      return;
+    }
+
+    setEditPwSubmitting(true);
+    try {
+      const res = await fetch(`/api/v1/admin/users/${editPwUser.id}/password`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: newPassword }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || "Failed to update password");
+        return;
+      }
+
+      toast.success("Password updated");
+      setEditPwOpen(false);
+      setEditPwUser(null);
+      setNewPassword("");
+      setNewPasswordConfirm("");
+      router.refresh();
+    } catch {
+      toast.error("Failed to update password");
+    } finally {
+      setEditPwSubmitting(false);
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -323,6 +379,12 @@ export function AdminUserList({ users }: { users: AuthUser[] }) {
                         >
                           <Mail className="mr-2 h-4 w-4" />
                           Resend Password
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => openEditPassword(user)}
+                        >
+                          <KeyRound className="mr-2 h-4 w-4" />
+                          Set Password
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => handleDelete(user.id)}
@@ -521,6 +583,109 @@ export function AdminUserList({ users }: { users: AuthUser[] }) {
                 disabled={submitting || (passwordMode === "manual" && (manualPassword.length < 8 || manualPassword !== confirmPassword))}
               >
                 {submitting ? "Creating..." : "Create User"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Password Dialog */}
+      <Dialog
+        open={editPwOpen}
+        onOpenChange={(open) => {
+          setEditPwOpen(open);
+          if (!open) {
+            setEditPwUser(null);
+            setNewPassword("");
+            setNewPasswordConfirm("");
+            setShowNewPassword(false);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Set Password</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditPassword} className="space-y-4">
+            {editPwUser && (
+              <div className="rounded-lg border bg-secondary/40 p-3 text-sm">
+                <div>
+                  <span className="text-muted-foreground">Name: </span>
+                  <span className="font-medium">
+                    {editPwUser.user_metadata?.full_name || "—"}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Email: </span>
+                  <span className="font-medium">{editPwUser.email}</span>
+                </div>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="edit-pw-new">New Password</Label>
+              <div className="relative">
+                <Input
+                  id="edit-pw-new"
+                  type={showNewPassword ? "text" : "password"}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Min 8 characters"
+                  minLength={8}
+                  required
+                  className="pr-9"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showNewPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-pw-confirm">Confirm Password</Label>
+              <Input
+                id="edit-pw-confirm"
+                type={showNewPassword ? "text" : "password"}
+                value={newPasswordConfirm}
+                onChange={(e) => setNewPasswordConfirm(e.target.value)}
+                placeholder="Re-enter password"
+                minLength={8}
+                required
+              />
+              {newPasswordConfirm && newPassword !== newPasswordConfirm && (
+                <p className="text-xs text-destructive">
+                  Passwords do not match
+                </p>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              No email will be sent. Share this password with the user directly
+              (e.g. via WhatsApp). They can log in immediately — no reset
+              required.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditPwOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={
+                  editPwSubmitting ||
+                  newPassword.length < 8 ||
+                  newPassword !== newPasswordConfirm
+                }
+              >
+                {editPwSubmitting ? "Updating..." : "Update Password"}
               </Button>
             </div>
           </form>
